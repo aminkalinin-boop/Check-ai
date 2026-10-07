@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка DOCX на ИИ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=PT+Sans+Caption:wght@700&family=PT+Mono&display=swap">
+<style>
+/* Рабочий инструмент эксперта: одна колонка, сводка сверху, детали во вкладках */
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --surface2:#f0f2f5; --text:#1d2330; --muted:#5d6675; --line:#dde1e7; --accent:#2f5aa8;
+  --strong:#c0392b; --strong-bg:#fbe4e1; --medium:#b7791f; --medium-bg:#fcefd6; --weak:#2f6fb3; --weak-bg:#e3eefa; --info:#6b7280; --info-bg:#eceef1;
+  --ok:#2e7d4f; --ok-bg:#e2f3e8;
+  --font-body:"PT Sans","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif; --font-head:"PT Sans Caption","PT Sans","Segoe UI",system-ui,sans-serif; --font-mono:"PT Mono",Consolas,"Cascadia Mono",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15181d; --surface:#1d2128; --surface2:#252a33; --text:#e6e9ee; --muted:#9aa3b2; --line:#323946; --accent:#7ea6ec;
+    --strong:#f08a7e; --strong-bg:#3d2320; --medium:#e7b35c; --medium-bg:#3a2e17; --weak:#86b5ea; --weak-bg:#1d2d42; --info:#a0a7b3; --info-bg:#2a2f37; --ok:#7dcc9b; --ok-bg:#1d3326; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+    --bg:#15181d; --surface:#1d2128; --surface2:#252a33; --text:#e6e9ee; --muted:#9aa3b2; --line:#323946; --accent:#7ea6ec;
+    --strong:#f08a7e; --strong-bg:#3d2320; --medium:#e7b35c; --medium-bg:#3a2e17; --weak:#86b5ea; --weak-bg:#1d2d42; --info:#a0a7b3; --info-bg:#2a2f37; --ok:#7dcc9b; --ok-bg:#1d3326; color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--text);font:15.5px/1.5 var(--font-body)}
+h1,h2,h3{font-family:var(--font-head);text-wrap:balance}
+.wrap{max-width:1100px;margin:0 auto;padding-block:28px 60px;padding-inline:20px}
+header h1{font-size:24px;margin:0 0 4px;letter-spacing:-.01em}
+header p{margin:0;color:var(--muted)}
+.drop{margin-top:22px;border:2px dashed var(--line);border-radius:14px;background:var(--surface);padding:38px 20px;text-align:center;cursor:pointer;transition:.15s}
+.drop:hover,.drop.over,.drop:focus-visible{border-color:var(--accent);outline:none;background:var(--surface2)}
+.drop b{font-size:17px}.drop .muted{margin-top:6px}
+.note{display:flex;gap:10px;margin-top:14px;padding:12px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--line);font-size:13.5px;color:var(--muted)}
+#progress{margin-top:18px;display:flex;align-items:center;gap:10px;color:var(--muted)}
+.spin{width:18px;height:18px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}
+#error{margin-top:18px;padding:12px 14px;border-radius:10px;background:var(--strong-bg);color:var(--strong)}
+.muted{color:var(--muted)} .small{font-size:13px}
+code{font-family:var(--font-mono);font-size:12.5px;word-break:break-all}
+#results{margin-top:28px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+button{font:inherit;border-radius:9px;padding:9px 16px;border:1px solid var(--line);background:var(--surface);color:var(--text);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button:disabled{opacity:.6;cursor:default}
+.verdict{border-radius:14px;padding:18px 20px;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--ok)}
+.verdict.v-strong{border-left-color:var(--strong)} .verdict.v-medium{border-left-color:var(--medium)} .verdict.v-weak{border-left-color:var(--weak)}
+.v-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.verdict h2{margin:2px 0 6px;font-size:20px;line-height:1.3}
+.verdict p{margin:6px 0}
+.conf{text-align:right;font-size:12px;color:var(--muted);white-space:nowrap}.conf b{font-size:16px;color:var(--text)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi-t{font-size:12.5px;color:var(--muted)} .kpi-n{font-size:26px;font-weight:650;font-variant-numeric:tabular-nums;margin:2px 0} .kpi-d{font-size:12px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:14px}
+.card h3{margin:0 0 8px;font-size:15px}
+#map{display:flex;flex-wrap:wrap;gap:2px}
+.cell{width:9px;height:14px;border-radius:2px;background:var(--surface2);border:1px solid var(--line);cursor:pointer}
+.cell.m-h{background:var(--text);opacity:.55;border-color:transparent}
+.cell.m-strong{background:var(--strong);border-color:transparent}.cell.m-medium{background:var(--medium);border-color:transparent}.cell.m-weak{background:var(--weak);border-color:transparent;opacity:.7}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.tabs{display:flex;gap:4px;margin-top:22px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{border:none;background:none;border-bottom:2px solid transparent;border-radius:0;padding:9px 12px;color:var(--muted);white-space:nowrap}
+.tab.active{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
+.pane{padding-top:14px}
+.group{margin-bottom:18px}
+.group h3{font-size:15px;margin:0 0 8px}
+.cnt{font-size:12px;color:var(--muted);background:var(--surface2);border-radius:10px;padding:1px 8px;margin-left:4px;font-weight:500}
+.none{margin:0 0 4px}
+.finding{background:var(--surface);border:1px solid var(--line);border-radius:10px;margin-bottom:6px}
+.finding summary{cursor:pointer;padding:9px 12px;display:flex;gap:10px;align-items:center;list-style:none}
+.finding summary::-webkit-details-marker{display:none}
+.f-title{font-weight:550}
+.f-body{padding:0 12px 10px 12px;font-size:14px}.f-body p{margin:4px 0}
+.ex{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--muted)} .ex li{margin:3px 0}
+.badge{font-size:11.5px;font-weight:600;border-radius:6px;padding:2px 7px;white-space:nowrap}
+.b-strong{background:var(--strong-bg);color:var(--strong)}.b-medium{background:var(--medium-bg);color:var(--medium)}.b-weak{background:var(--weak-bg);color:var(--weak)}.b-info{background:var(--info-bg);color:var(--info)}
+table{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+thead th{background:var(--surface2);font-weight:600}
+tbody th{width:32%;color:var(--muted);font-weight:500}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bar{display:inline-block;width:60%;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;vertical-align:middle;margin-right:8px}.bar span{display:block;height:100%;background:var(--strong)}
+.ptools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+select{font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--text);max-width:100%}
+.para{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.para.focus{outline:2px solid var(--accent)}
+.p-head{display:flex;gap:10px;font-size:12.5px;flex-wrap:wrap}
+.p-flags{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0}
+.chip{font-size:11.5px;border-radius:6px;padding:1px 7px}
+.c-strong{background:var(--strong-bg);color:var(--strong)}.c-medium{background:var(--medium-bg);color:var(--medium)}.c-weak{background:var(--weak-bg);color:var(--weak)}.c-info{background:var(--info-bg);color:var(--info)}
+.p-text{font-size:14px;white-space:pre-wrap}
+mark{background:var(--medium-bg);color:inherit;border-radius:3px;padding:0 2px}
+mark.inv{background:var(--strong-bg);color:var(--strong)}
+footer{margin-top:40px;font-size:12.5px;color:var(--muted)}
+#saveMsg{font-size:13.5px;color:var(--muted);align-self:center}
+#stylo,#loc,#sections,#styles,#meta{overflow-x:auto}
+#stylo table,#loc table,#sections table,#styles table{min-width:560px}
+button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:3s}}
+@media (max-width:760px){.kpis{grid-template-columns:repeat(2,1fr)}.v-head{flex-direction:column}.conf{text-align:left}.wrap{padding-block:18px 40px;padding-inline:16px}.kpi-n{font-size:22px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Проверка документа на признаки применения ИИ</h1>
+    <p>Анализ DOCX: разметка веб-интерфейсов нейросетей, скрытые символы, метаданные, остатки ответов чат-ботов, повторы, сноски и ссылки.</p>
+  </header>
+
+  <div id="drop" class="drop" tabindex="0" role="button" aria-label="Выбрать файл">
+    <b>Нажмите, чтобы выбрать файл .docx</b>
+    <div class="muted">На компьютере файл можно перетащить сюда</div>
+    <div class="muted">Поддерживаются .docx, а также .txt и .md (только текстовые проверки)</div>
+    <input id="file" type="file" accept=".docx,.docm,.txt,.md" hidden>
+  </div>
+  <div class="note"><span>Документ разбирается прямо в браузере на вашем устройстве и никуда не отправляется. Статистические водяные знаки разработчиков моделей (Claude, Gemini SynthID) программа не видит: их проверяют только сами компании.</span></div>
+
+
+  <div id="progress" hidden><div class="spin"></div><span id="status"></span></div>
+  <div id="error" hidden></div>
+
+  <div id="results" hidden>
+    <div class="actions">
+      <button id="export" class="primary">Скачать заключение .docx</button>
+      <button id="annot">Скачать документ с подсветкой</button>
+      <button id="again">Проверить другой файл</button>
+      <span id="saveMsg" role="status"></span>
+    </div>
+    <div id="verdict" class="verdict"></div>
+    <div id="kpis" class="kpis"></div>
+    <div class="card">
+      <h3>Карта документа</h3>
+      <div id="map"></div>
+      <div class="legend"><span><i style="background:var(--strong)"></i>сильный признак</span><span><i style="background:var(--medium)"></i>средний</span><span><i style="background:var(--weak)"></i>слабый</span><span><i style="background:var(--text);opacity:.55"></i>заголовок</span><span>Каждая клетка — абзац; нажмите, чтобы открыть его.</span></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="findings">Признаки</button>
+      <button class="tab" data-tab="paras">Абзацы</button>
+      <button class="tab" data-tab="stylo">Стилометрия</button>
+      <button class="tab" data-tab="loc">Локализация</button>
+      <button class="tab" data-tab="sections">По разделам</button>
+      <button class="tab" data-tab="styles">Стили</button>
+      <button class="tab" data-tab="meta">Метаданные</button>
+    </div>
+    <div class="pane" id="pane-findings"><div id="findings"></div></div>
+    <div class="pane" id="pane-paras" hidden>
+      <div class="ptools"><select id="pfilter"></select><span id="pcount" class="muted small"></span></div>
+      <div id="paras"></div>
+    </div>
+    <div class="pane" id="pane-stylo" hidden><div id="stylo"></div></div>
+    <div class="pane" id="pane-loc" hidden><div id="loc"></div></div>
+    <div class="pane" id="pane-sections" hidden><div id="sections"></div></div>
+    <div class="pane" id="pane-styles" hidden><div id="styles"></div></div>
+    <div class="pane" id="pane-meta" hidden><div id="meta"></div></div>
+  </div>
+
+  <footer>Результаты носят вероятностный характер: признак показывает, что текст проходил через соответствующий сервис или веб-страницу, но не устанавливает авторство и долю машинного текста.</footer>
+</div>
+<script>/*JSZIP*/</script>
+<script>/*APP*/</script>
+</body>
+</html>

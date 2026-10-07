@@ -1,0 +1,135 @@
+{
+ "n_human": 62,
+ "n_post": 17,
+ "features": {
+  "evaluative": {
+   "p10": 1.175,
+   "p50": 4.727,
+   "p90": 10.675,
+   "post_p50": 5.495,
+   "post_share_over_p90": 0.235,
+   "human_share_over_p90": 0.113
+  },
+  "excess": {
+   "p10": 0.0,
+   "p50": 0.0,
+   "p90": 0.662,
+   "post_p50": 0.0,
+   "post_share_over_p90": 0.118,
+   "human_share_over_p90": 0.113
+  },
+  "netolko": {
+   "p10": 0.0,
+   "p50": 0.0,
+   "p90": 1.032,
+   "post_p50": 0.861,
+   "post_share_over_p90": 0.294,
+   "human_share_over_p90": 0.113
+  },
+  "neprosto": {
+   "p10": 0.0,
+   "p50": 0.0,
+   "p90": 0.0,
+   "post_p50": 0.0,
+   "post_share_over_p90": 0.059,
+   "human_share_over_p90": 0.065
+  },
+  "tail": {
+   "p10": 0.0,
+   "p50": 0.0,
+   "p90": 0.0,
+   "post_p50": 0.0,
+   "post_share_over_p90": 0.176,
+   "human_share_over_p90": 0.097
+  },
+  "etodash": {
+   "p10": 0.0,
+   "p50": 0.0,
+   "p90": 0.661,
+   "post_p50": 0.0,
+   "post_share_over_p90": 0.294,
+   "human_share_over_p90": 0.113
+  },
+  "dash": {
+   "p10": 1.136,
+   "p50": 5.212,
+   "p90": 9.728,
+   "post_p50": 7.053,
+   "post_share_over_p90": 0.235,
+   "human_share_over_p90": 0.113
+  },
+  "colon": {
+   "p10": 0.978,
+   "p50": 2.837,
+   "p90": 7.439,
+   "post_p50": 4.955,
+   "post_share_over_p90": 0.353,
+   "human_share_over_p90": 0.113
+  },
+  "meta": {
+   "p10": 0.0,
+   "p50": 1.327,
+   "p90": 3.257,
+   "post_p50": 0.245,
+   "post_share_over_p90": 0.0,
+   "human_share_over_p90": 0.113
+  },
+  "ramki": {
+   "p10": 0.0,
+   "p50": 0.996,
+   "p90": 3.289,
+   "post_p50": 0.735,
+   "post_share_over_p90": 0.118,
+   "human_share_over_p90": 0.113
+  },
+  "intens": {
+   "p10": 0.0,
+   "p50": 0.0,
+   "p90": 0.662,
+   "post_p50": 0.0,
+   "post_share_over_p90": 0.118,
+   "human_share_over_p90": 0.113
+  },
+  "links": {
+   "p10": 1.047,
+   "p50": 3.426,
+   "p90": 5.184,
+   "post_p50": 3.567,
+   "post_share_over_p90": 0.235,
+   "human_share_over_p90": 0.113
+  },
+  "summary": {
+   "p10": 0.0,
+   "p50": 0.0,
+   "p90": 0.0,
+   "post_p50": 0.0,
+   "post_share_over_p90": 0.118,
+   "human_share_over_p90": 0.081
+  },
+  "commas": {
+   "p10": 1.135,
+   "p50": 1.506,
+   "p90": 2.171,
+   "post_p50": 2.047,
+   "post_share_over_p90": 0.471,
+   "human_share_over_p90": 0.113
+  },
+  "constart": {
+   "p10": 2.745,
+   "p50": 8.488,
+   "p90": 13.63,
+   "post_p50": 9.091,
+   "post_share_over_p90": 0.059,
+   "human_share_over_p90": 0.113
+  },
+  "sentcv": {
+   "p10": 0.45,
+   "p50": 0.636,
+   "p90": 0.877,
+   "post_p50": 0.65,
+   "post_share_over_p90": 0.176,
+   "human_share_over_p90": 0.113
+  }
+ },
+ "описание": "Процентили показателей на 1000 слов (commas — запятых на предложение, constart — % предложений, sentcv — разброс длины предложений). Эталон: статьи научного автора-экономиста 2016–2022 гг. (n_human), сравнение: его статьи 2023–2026 гг. после правки (n_post). Тексты и имена не хранятся."
+}
