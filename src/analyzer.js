@@ -792,10 +792,10 @@ function textChecks(res, onProgress) {
     const pm = plen.reduce((a, b) => a + b, 0) / (plen.length || 1);
     const pcv = Math.sqrt(plen.reduce((a, b) => a + (b - pm) ** 2, 0) / (plen.length || 1)) / (pm || 1);
     res.stats.paraLen = { n: plen.length, mean: pm, cv: pcv };
-    const uniform = cv < 0.42 && pcv < 0.45;
+    const uniform = cv < 0.30 || (cv < 0.42 && pcv < 0.45);
     addFinding(res, { id: 'rhythm', group: 'style', title: 'Ритм текста (однородность длины предложений и абзацев)', level: uniform ? 'weak' : 'info', value: Math.round(cv * 100) / 100,
       detail: `Предложений: ${fmtNum(sents.length)}, средняя длина ${mean.toFixed(1)} слова, коэффициент вариации ${cv.toFixed(2)}; абзацев: ${plen.length}, средняя длина ${pm.toFixed(0)} слов, вариация ${pcv.toFixed(2)}. ` + (uniform ? 'Длины необычно однородны — так часто выглядит сгенерированный текст.' : 'Длины варьируют естественно.'),
-      note: 'Статистический показатель; надёжно отличить ИИ-текст от человеческого по нему нельзя.' });
+      note: 'Показатель «взрывности» (burstiness): человек чередует длинные и короткие предложения, модель пишет ровнее. На корпусе AINL-Eval 2025 коэффициент вариации у людей около 0,38, у моделей 0,19–0,23; в эталонных статьях автора-экономиста 2016–2022 гг. ниже 0,45 лишь каждая десятая. Статистический показатель; надёжно отличить ИИ-текст от человеческого по нему одному нельзя.' });
   }
 
   if (res.kind === 'text') return;

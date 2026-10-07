@@ -180,7 +180,21 @@ function imageDims(u8) {
 }
 
 /* ---------- типографика тире ---------- */
+// Стрелки «→» в связном тексте: модели ставят их в перечнях и причинно-следственных цепочках.
+// В эталонном корпусе автора (2016–2022) их нет ни в одной статье; в статьях 2023+ — в 12%.
+function arrowChecks(res) {
+  const ps = res.paras.filter(p => !p.toc && !p.bib && !p.inTable && !p.inBox && p.words >= 4 && /[→⟶➔➝⇒]/.test(p.text));
+  if (!ps.length) return;
+  const n = ps.reduce((a, p) => a + (p.text.match(/[→⟶➔➝⇒]/g) || []).length, 0);
+  ps.forEach(p => p.flags.push({ type: 'typo', key: 'arrow', level: 'weak', label: 'Стрелка «→» в тексте' }));
+  addFinding(res, { id: 'arrow', group: 'chars', title: `Стрелки «→» в связном тексте: ${n} в ${ps.length} абз.`, level: 'weak', value: n,
+    detail: `Стрелки вместо слов («ведёт к», «далее», «приводит к») в обычных абзацах вне таблиц и рисунков: ${n}.`,
+    note: 'Символ «→» в Word вводится только через «Вставка → Символ» или автозамену; в ответах чат-ботов он обычен для перечней и цепочек «причина → следствие». В эталонном корпусе научного автора 2016–2022 гг. стрелок в тексте нет. Слабый признак: стрелки уместны в формулах и схемах.',
+    examples: ps.slice(0, 4).map(p => ({ para: p.i, text: `${pg(p) || 'абз. ' + (p.i + 1)}: «${snippet(p.text, p.text.search(/[→⟶➔➝⇒]/), 140)}»` })) });
+}
+
 function dashChecks(res) {
+  arrowChecks(res);
   const paras = res.paras.filter(p => !p.toc && !p.bib && p.words >= 5);
   let hy = 0, en = 0, em = 0, intraDash = 0, intraHy = 0;
   const emParas = [], hyParas = [], intraEx = [];
