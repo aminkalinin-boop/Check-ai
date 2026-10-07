@@ -6,7 +6,7 @@
 
 const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const MC_NS = 'http://schemas.openxmlformats.org/markup-compatibility/2006';
-const APP_VERSION = '3.1';
+const APP_VERSION = '3.2';
 
 /* ---------------- хеши (MD5 / SHA-256) ---------------- */
 function md5(buf) {
