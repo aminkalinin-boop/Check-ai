@@ -183,7 +183,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
 const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const MC_NS = 'http://schemas.openxmlformats.org/markup-compatibility/2006';
-const APP_VERSION = '3.2';
+const APP_VERSION = '3.3';
 
 /* ---------------- хеши (MD5 / SHA-256) ---------------- */
 function md5(buf) {
@@ -513,7 +513,9 @@ function classifyStyle(st) {
     st.category = 'webui'; st.source = 'Tailwind CSS (ChatGPT, Claude, Perplexity и др. чат-интерфейсы)'; st.level = 'medium';
     st.note = 'Служебные классы CSS-фреймворка Tailwind (например, «my-2», «whitespace-normal», «group-hover/…»). Tailwind используют веб-интерфейсы ChatGPT, Claude, Perplexity и многие другие сайты.'; return;
   }
-  if (st.custom && /^xl\d+$/i.test(n)) { st.category = 'excel'; st.source = 'Вставка таблицы из Excel'; st.level = 'info'; st.note = 'Стили «xl63…» появляются при вставке таблиц из Excel — признак работы с собственными расчётами.'; return; }
+  if (st.custom && /^xl\d+$/i.test(n)) { st.category = 'excel'; st.source = 'Вставка таблицы из Excel'; st.level = 'info'; st.note = 'Стили «xl63…» появляются при вставке таблиц из Excel. Показывают путь таблицы (через Excel), но не то, кто составил её содержимое: таблицу, полученную от нейросети, тоже можно провести через Excel.'; return; }
+  // имя стиля совпадает с именем XML-элемента Word (pStyle, rStyle, tblStyle…): так называют классы конвертеры DOCX→HTML и веб-редакторы; человек в Word такой стиль не создаёт
+  if (st.custom && /^(p|r|tbl|num)Style\d*$/.test(n)) { st.category = 'html'; st.source = 'Вставка из веб-страницы или конвертера DOCX → HTML'; st.level = 'weak'; st.note = 'Имя стиля совпадает со служебным элементом разметки Word («pStyle»). Такой класс создают программы, переводящие документ в HTML, и веб-редакторы; при ручном наборе в Word он не возникает. Конкретный сервис не устанавливает.'; return; }
   if (st.custom && /^msonormal$/i.test(n)) { st.category = 'junk'; st.source = 'Вставка из Outlook / HTML-версии Word'; st.level = 'info'; return; }
   if (HTML_STYLE_NAMES.test(n)) { st.category = 'html'; st.source = 'Вставка HTML из браузера'; st.level = 'weak'; st.note = 'Стиль Word, создаваемый при вставке фрагмента веб-страницы.'; return; }
   if (/знак$|char$/i.test(n)) { st.category = 'linked'; return; }
@@ -741,7 +743,7 @@ function styleChecks(res) {
   res.stats.runMarkedParas = runMarked.length;
   res.stats.runMarkedWords = res.styles.filter(s => s.category === 'webui').reduce((a, s) => a + s.runWords, 0);
   const xl = suspicious.filter(s => s.category === 'excel');
-  if (xl.length) addFinding(res, { id: 'style:excel', group: 'tech', title: `Стили вставки таблиц из Excel (${xl.length})`, level: 'info', value: xl.length, detail: `Стили «${xl.slice(0, 3).map(s => s.name).join('», «')}»${xl.length > 3 ? '…' : ''}.`, note: 'Появляются при вставке таблиц из Excel; указывают на работу с собственными расчётными таблицами, а не на ИИ.' });
+  if (xl.length) addFinding(res, { id: 'style:excel', group: 'tech', title: `Стили вставки таблиц из Excel (${xl.length})`, level: 'info', value: xl.length, detail: `Стили «${xl.slice(0, 3).map(s => s.name).join('», «')}»${xl.length > 3 ? '…' : ''}.`, note: 'Появляются при вставке таблиц из Excel. Сами по себе на ИИ не указывают, но и авторство данных не подтверждают: таблицу из ответа нейросети можно провести через Excel. Как признак собственных расчётов учитываются, только если в документе нет стилей веб-интерфейсов нейросетей.' });
   for (const s of suspicious.filter(s => s.category !== 'excel')) {
     const used = s.paras + s.runs;
     const src = s.source;
@@ -1123,7 +1125,7 @@ function finalize(res) {
   if (res.meta.addins && res.meta.addins.length) human.push('менеджер библиографии: ' + res.meta.addins.join(', '));
   if (res.meta.chartExternal) human.push(`диаграммы, связанные с внешними Excel-файлами (${res.meta.chartExternal})`);
   if (res.meta.distinctRsids > 300) human.push(`длительная история правки (${fmtNum(res.meta.distinctRsids)} сеансов rsid)`);
-  if (F.some(f => f.id === 'style:excel')) human.push('таблицы, вставленные из Excel');
+  if (F.some(f => f.id === 'style:excel') && !res.styles.some(x => (x.category === 'webui' || x.category === 'hash') && (x.paras || x.runs))) human.push('таблицы, вставленные из Excel');
   const ed = (res.stats.figures || []).filter(f => f.type === 'editable').length; if (ed) human.push(`схемы, собранные из фигур Word (${ed})`);
   if (res.meta.insertions || res.meta.deletions) human.push(`записанные исправления (${res.meta.insertions + res.meta.deletions})`);
   if (F.some(f => f.id === 'comp:notes')) human.push('рабочие заметки автора');
@@ -2048,7 +2050,7 @@ async function buildReportDocx(res) {
   const hrows = [];
   if (m.addins && m.addins.length) hrows.push(['Менеджер библиографии', m.addins.join(', '), 'Ручная либо полуавтоматизированная работа с источниками']);
   if (m.chartExternal || m.charts) hrows.push(['Диаграммы и Excel', `${fN(m.charts)} диаграмм Word, ${fN(m.chartExternal)} внешних связей${m.xlsxTargets && m.xlsxTargets.length ? ' (' + m.xlsxTargets.slice(0, 3).join(', ') + ')' : ''}`, 'Наличие отдельного расчётно-графического контура']);
-  if (F.some(f => f.id === 'style:excel')) hrows.push(['Таблицы из Excel', byId('style:excel').detail, 'Работа с собственными расчётными таблицами']);
+  if (F.some(f => f.id === 'style:excel') && !res.styles.some(x => (x.category === 'webui' || x.category === 'hash') && (x.paras || x.runs))) hrows.push(['Таблицы из Excel', byId('style:excel').detail, 'Работа с собственными расчётными таблицами']);
   hrows.push(['Структура исследования', `${fN(m.captionsTab)} таблиц, ${fN(m.captionsFig)} рисунков, ${fN(m.formulas)} формул, ${fN(m.appendices)} приложений`, 'Сложная сборка и форматирование']);
   if (m.distinctRsids) hrows.push(['rsid', `${fN(m.distinctRsids)} уникальных идентификаторов редактирования`, 'Множественные операции изменения и вставки']);
   if (byId('comp:notes')) hrows.push(['Рабочие заметки', `${fN(byId('comp:notes').value)} заметок`, 'Незавершённость и ручная сборка']);

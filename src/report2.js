@@ -207,7 +207,7 @@ async function buildReportDocx(res) {
   const hrows = [];
   if (m.addins && m.addins.length) hrows.push(['Менеджер библиографии', m.addins.join(', '), 'Ручная либо полуавтоматизированная работа с источниками']);
   if (m.chartExternal || m.charts) hrows.push(['Диаграммы и Excel', `${fN(m.charts)} диаграмм Word, ${fN(m.chartExternal)} внешних связей${m.xlsxTargets && m.xlsxTargets.length ? ' (' + m.xlsxTargets.slice(0, 3).join(', ') + ')' : ''}`, 'Наличие отдельного расчётно-графического контура']);
-  if (F.some(f => f.id === 'style:excel')) hrows.push(['Таблицы из Excel', byId('style:excel').detail, 'Работа с собственными расчётными таблицами']);
+  if (F.some(f => f.id === 'style:excel') && !res.styles.some(x => (x.category === 'webui' || x.category === 'hash') && (x.paras || x.runs))) hrows.push(['Таблицы из Excel', byId('style:excel').detail, 'Работа с собственными расчётными таблицами']);
   hrows.push(['Структура исследования', `${fN(m.captionsTab)} таблиц, ${fN(m.captionsFig)} рисунков, ${fN(m.formulas)} формул, ${fN(m.appendices)} приложений`, 'Сложная сборка и форматирование']);
   if (m.distinctRsids) hrows.push(['rsid', `${fN(m.distinctRsids)} уникальных идентификаторов редактирования`, 'Множественные операции изменения и вставки']);
   if (byId('comp:notes')) hrows.push(['Рабочие заметки', `${fN(byId('comp:notes').value)} заметок`, 'Незавершённость и ручная сборка']);
