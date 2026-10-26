@@ -26,6 +26,8 @@ jobs:
           node --check src/provenance_fairness.js
       - name: Check countermeasure diagnostics
         run: node --test tests/robustness.test.cjs tests/academic_audit.test.cjs tests/discourse_audit.test.cjs tests/provenance_fairness.test.cjs
+      - name: Validate local reference-highlight audit (no source documents uploaded)
+        run: python3 -m unittest discover -s tests -p 'test_reference_highlight.py'
       - name: Create both builds and published page
         run: |
           python3 build.py
