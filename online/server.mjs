@@ -14,12 +14,15 @@ const HOST = process.env.HOST || '127.0.0.1';
 const PORT = Number(process.env.PORT || 8787);
 const API_KEY = process.env.OPENAI_API_KEY || '';
 const ACCESS = process.env.CHECK_AI_ACCESS_TOKEN || '';
+// Trusted reverse proxy must authenticate users, strip incoming spoofed
+// X-CheckAI-Gateway-Secret and inject the secret only after authentication.
+const GATEWAY_SECRET = process.env.CHECK_AI_GATEWAY_SECRET || '';
 const MODEL = process.env.OPENAI_MODEL || 'gpt-6-astra';
 const ALLOWED_ORIGIN = process.env.CHECK_AI_ALLOWED_ORIGIN || 'https://aminkalinin-boop.github.io';
 const MAX_BYTES = 90000;
 const recent = new Map();
-if (!ACCESS || !API_KEY) {
-  console.error('Set OPENAI_API_KEY and CHECK_AI_ACCESS_TOKEN in the server environment.');
+if ((!ACCESS && !GATEWAY_SECRET) || !API_KEY) {
+  console.error('Set OPENAI_API_KEY and one secure authorization mode: CHECK_AI_GATEWAY_SECRET or CHECK_AI_ACCESS_TOKEN.');
   process.exit(1);
 }
 
@@ -55,11 +58,15 @@ function json(res, status, value) {
   });
   res.end(JSON.stringify(value));
 }
-function authorized(value) {
-  if (!value || !value.startsWith('Bearer ')) return false;
-  const candidate = Buffer.from(value.slice(7));
-  const expected = Buffer.from(ACCESS);
-  return candidate.length === expected.length && timingSafeEqual(candidate, expected);
+function sameSecret(input, secret) {
+  if (!secret || !input || typeof input !== 'string') return false;
+  const a = Buffer.from(input), b = Buffer.from(secret);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+function authorized(req) {
+  if (GATEWAY_SECRET && sameSecret(req.headers['x-checkai-gateway-secret'], GATEWAY_SECRET)) return true;
+  const value = req.headers.authorization;
+  return !!(ACCESS && value && value.startsWith('Bearer ') && sameSecret(value.slice(7), ACCESS));
 }
 function limited(ip) {
   const now = Date.now(), windowMs = 15 * 60 * 1000;
@@ -176,6 +183,7 @@ const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin;
   if (origin && origin === ALLOWED_ORIGIN) {
     res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
@@ -193,7 +201,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'GET' && req.url === '/health') return json(res, 200, { ok: true });
   if (req.method !== 'POST' || req.url !== '/api/review') return json(res, 404, { error: 'Маршрут не найден' });
-  if (!authorized(req.headers.authorization)) return json(res, 401, { error: 'Неверный код доступа' });
+  if (!authorized(req)) return json(res, 401, { error: 'Доступ к онлайн-экспертизе не подтверждён. Нужен защищённый сервер с аутентификацией.' });
   if (req.headers['content-type']?.split(';')[0] !== 'application/json') return json(res, 415, { error: 'Ожидается JSON' });
   const ip = req.socket.remoteAddress || 'unknown';
   if (limited(ip)) return json(res, 429, { error: 'Лимит запросов: повторите позже' });

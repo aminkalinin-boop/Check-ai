@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src"
 ORDER = [
     "analyzer.js", "content.js", "stylometry.js", "extra.js",
-    "robustness.js", "academic_audit.js", "discourse_audit.js", "provenance_fairness.js", "report_docx.js", "report2.js", "annotate.js", "platform.js", "ui.js"
+    "robustness.js", "academic_audit.js", "discourse_audit.js", "provenance_fairness.js", "offline_engine.js", "report_docx.js", "report2.js", "annotate.js", "platform.js", "ui.js"
 ]
 
 
@@ -34,21 +34,23 @@ def main():
     out_offline.mkdir(parents=True, exist_ok=True)
     out_online.mkdir(parents=True, exist_ok=True)
 
+    # The same interface is shipped in both builds; offline mode is truly local.
+    config = (ROOT / "online" / "site_config.js").read_text(encoding="utf-8")
+    addon = (ROOT / "online" / "online_addon.js").read_text(encoding="utf-8")
+    if "</script" in config.lower() or "</script" in addon.lower():
+        raise ValueError("Unsafe closing script tag")
+    unified = core.replace("</body>", "<script>\n" + config + "\n" + addon + "\n</script>\n</body>")
     # The core already includes JSZip and all business logic. Strip optional
     # external web-font stylesheets to avoid even a font request when offline.
-    offline = re.sub(r'<link\s+rel="preconnect"\s+href="https://fonts\.googleapis\.com"\s*>\s*', "", core)
+    offline = re.sub(r'<link\s+rel="preconnect"\s+href="https://fonts\.googleapis\.com"\s*>\s*', "", unified)
     offline = re.sub(r'<link\s+rel="stylesheet"\s+href="https://fonts\.googleapis\.com/[^"]+"\s*>\s*', "", offline)
     if "fonts.googleapis.com" in offline:
         raise ValueError("Offline build retains an external font request")
 
-    # The online build is identical to root index.html: shared app code plus
-    # optional add-on injected into the same script by the original build flow.
+    # The public index.html is the same online-capable interface.
     template = (SOURCE / "template.html").read_text(encoding="utf-8")
     jszip = (ROOT / "vendor" / "jszip.min.js").read_text(encoding="utf-8")
-    addon = (ROOT / "online" / "online_addon.js").read_text(encoding="utf-8")
-    js = "\n".join((SOURCE / name).read_text(encoding="utf-8") for name in ORDER) + "\n" + addon
-    if "</script" in addon.lower():
-        raise ValueError("Unsafe closing script tag in online add-on")
+    js = "\n".join((SOURCE / name).read_text(encoding="utf-8") for name in ORDER) + "\n" + config + "\n" + addon
     online = template.replace("/*JSZIP*/", jszip).replace("/*APP*/", js)
 
     (out_offline / "index.html").write_text(offline, encoding="utf-8")

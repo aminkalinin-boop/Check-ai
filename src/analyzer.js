@@ -226,6 +226,7 @@ async function analyzeFile(file, onProgress = () => {}) {
     discourseAuditChecks(res);
     provenanceFairnessChecks(res);
     finalize(res);
+    recordOfflineAudit(res);
     return res;
   }
   onProgress('Распаковка DOCX…');
@@ -292,6 +293,7 @@ async function analyzeFile(file, onProgress = () => {}) {
   discourseAuditChecks(res);
   provenanceFairnessChecks(res);
   finalize(res);
+  recordOfflineAudit(res);
   return res;
 }
 
