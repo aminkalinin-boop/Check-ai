@@ -31,8 +31,8 @@ async function buildReportDocx(res) {
 
   /* ---------- титул ---------- */
   out.push(para('ВНЕПРОЦЕССУАЛЬНОЕ ИССЛЕДОВАНИЕ', { style: 'Caps' }));
-  out.push(para('ЭКСПЕРТНО-АНАЛИТИЧЕСКОЕ ЗАКЛЮЧЕНИЕ', { style: 'Title' }));
-  out.push(para('о наличии и характере применения технологий генеративного искусственного интеллекта при подготовке документа', { style: 'Subtitle' }));
+  out.push(para('ОТЧЁТ ПРЕДВАРИТЕЛЬНОГО АУДИТА', { style: 'Title' }));
+  out.push(para('о технических, структурных и текстологических признаках в документе (без установления авторства)', { style: 'Subtitle' }));
   out.push(para(docTitle.length > 220 ? docTitle.slice(0, 220) + '…' : docTitle, { style: 'Subtitle' }));
   out.push(para('', { spacingAfter: 0 }));
   out.push(table([
@@ -43,14 +43,14 @@ async function buildReportDocx(res) {
     ['SHA-256', { t: res.file.sha256, mono: true }],
     ['Дата исследования', dt],
   ], [2600, 6755]));
-  out.push(para('Заключение подготовлено по представленной электронной копии документа', { style: 'Small', align: 'center' }));
+  out.push(para('Отчёт сформирован автоматически по электронной копии документа; авторство и факт генерации не устанавливаются', { style: 'Small', align: 'center' }));
 
   /* ---------- резюме ---------- */
   out.push(H1('Краткое резюме'));
-  const summ = [v.text + (v.confidence !== '—' ? ` (уверенность — ${v.confidence}).` : '.')];
-  if (v.mainSource) summ.push(`Наиболее вероятный источник по техническим следам: ${v.mainSource}. Характер использования: ${v.scale}.`);
+  const summ = [v.text + `. Характер признаков: ${v.evidence}.`];
+  if (v.mainSource) summ.push(`Обнаружена разметка, сходная с оформлением: ${v.mainSource}. Охват: ${v.scale}. Это не устанавливает авторство текста.`);
   summ.push(`Выявлено признаков: сильных — ${s.counts.strong}, средних — ${s.counts.medium}, слабых — ${s.counts.weak}, справочных — ${s.counts.info}.`);
-  out.push(box('Итоговая экспертная оценка', summ));
+  out.push(box('Предварительная оценка обнаруженных признаков', summ));
   const complexes = [];
   if (usedWeb.length) complexes.push(`Пользовательские стили веб-происхождения (${[...new Set(usedWeb.map(f => f.style.source))].join('; ')}): ${usedWeb.map(f => `«${f.style.name}» — ${[f.style.paras ? fN(f.style.paras) + ' абз.' : '', f.style.runs ? fN(f.style.runs) + ' фрагм.' : '', fN((f.style.words || 0) + (f.style.runWords || 0)) + ' сл.'].filter(Boolean).join(', ')}`).join('; ')}.`.replace('..', '.'));
   if (byId('links:google')) complexes.push(`Гиперссылки через переадресацию Google: ${fN(L.redirect)} из ${fN(L.total)} (${fmtPct(pct(L.redirect, L.total))}).`);
@@ -59,7 +59,7 @@ async function buildReportDocx(res) {
   if (byId('meta:gen')) complexes.push('Метаданные указывают на программную генерацию файла.');
   if (complexes.length) { out.push(P('Установлены следующие технические комплексы признаков:')); out.push(...NUM(complexes)); }
   if (s.localization && s.localization.length) out.push(P(`Технические маркеры распределены по ${s.localization.length} зонам, из них ${s.localization.filter(l => l.inTable).length} — в таблицах: ${s.localization.slice(0, 5).map(l => `${l.where.slice(0, 90)} (${l.pages})`).join('; ')}.`));
-  if (res.human.length) out.push(P('Одновременно файл содержит признаки самостоятельной работы: ' + res.human.join(', ') + '. ' + (s.counts.strong || s.counts.medium ? 'Наиболее корректная квалификация при таком сочетании — гибридная подготовка документа.' : '')));
+  if (res.human.length) out.push(P('Дополнительные особенности структуры и редактирования: ' + res.human.join(', ') + '. Они не подтверждают самостоятельное либо машинное авторство.'));
   const bounds = ['По одному итоговому файлу невозможно установить точную долю первоначально машинного текста, конкретную модель и её версию, содержание запросов, личность пользователя, последовательность редакций и степень переработки каждого фрагмента. Для этого необходимы исходные рабочие файлы, история версий, переписка с моделью, данные браузера и облачных сервисов.'];
   if (usedWeb.some(f => /Angular|Tailwind/.test(f.style.source))) bounds.push('Классы Angular и Tailwind являются маркерами веб-фреймворков, а не уникальными «водяными знаками» генеративной модели; их доказательственное значение возрастает только в совокупности с другими признаками.');
   bounds.push('Не проверялись статистические водяные знаки разработчиков моделей (Anthropic Claude, Google SynthID и др.): их обнаружение возможно только инструментами этих компаний. Заключение сформировано автоматически и подлежит оценке специалистом.');
@@ -70,10 +70,10 @@ async function buildReportDocx(res) {
   out.push(P(`Объектом исследования являлся электронный файл «${res.file.name}»` + (docTitle !== res.file.name ? `, содержащий работу «${docTitle.replace(/^[«"]|[»"]$/g, '')}»` : '') + `. В состав документа входят: ${[m.captionsTab ? `${fN(m.captionsTab)} подписанных таблиц` : '', m.captionsFig ? `${fN(m.captionsFig)} рисунков` : '', m.formulas ? `${fN(m.formulas)} формул` : '', m.appendices ? `${fN(m.appendices)} приложений` : '', res.footnotes.length ? `${fN(res.footnotes.length)} сносок` : '', s.bib ? `список литературы из ${fN(s.bib.items)} записей` : ''].filter(Boolean).join(', ') || 'текст без выделенных структурных элементов'}.`));
   out.push(P('Предмет исследования — сохранившиеся в контейнере DOCX технические признаки происхождения и маршрута переноса текста, особенности структуры и редактирования файла, а также текстологические и содержательные признаки, совместимые с применением генеративных языковых моделей.'));
   out.push(P('На разрешение были поставлены следующие вопросы:'));
-  out.push(...NUM(['Имеются ли в представленном файле признаки применения генеративного искусственного интеллекта при подготовке текста и аналитических материалов?',
-    'Каков наиболее вероятный характер такого применения: техническая коррекция, поиск информации, генерация, перефразирование, систематизация или компоновка материалов?',
-    'Позволяют ли технические данные определить наиболее вероятный сервис или семейство веб-интерфейсов, через которые переносился контент?',
-    'Имеются ли признаки самостоятельной человеческой работы и последующей ручной доработки документа?',
+  out.push(...NUM(['Какие специфические и косвенные технические маркеры присутствуют в файле?',
+    'Где расположены выявленные маркеры и каков охват сохранившейся разметки?',
+    'С разметкой каких веб-интерфейсов обнаружены совпадения и насколько они специфичны?',
+    'Какие сведения об истории редактирования и структуре доступны в итоговом файле?',
     'Какие обстоятельства не могут быть достоверно установлены только по исследованному файлу?']));
 
   /* ---------- 2 ---------- */
@@ -203,17 +203,17 @@ async function buildReportDocx(res) {
   const cf2 = gf('comp').filter(f => !['comp:fielderr', 'rep'].includes(f.id)); if (cf2.length) cf2.forEach(f => finding(f, 3)); else out.push(P('Признаков не обнаружено.'));
 
   /* ---------- 5 ---------- */
-  out.push(H1('5. Признаки человеческого участия и гибридный характер подготовки'));
+  out.push(H1('5. Особенности структуры и редактирования (без вывода об авторстве)'));
   const hrows = [];
-  if (m.addins && m.addins.length) hrows.push(['Менеджер библиографии', m.addins.join(', '), 'Ручная либо полуавтоматизированная работа с источниками']);
+  if (m.addins && m.addins.length) hrows.push(['Менеджер библиографии', m.addins.join(', '), 'Наличие программного менеджера ссылок']);
   if (m.chartExternal || m.charts) hrows.push(['Диаграммы и Excel', `${fN(m.charts)} диаграмм Word, ${fN(m.chartExternal)} внешних связей${m.xlsxTargets && m.xlsxTargets.length ? ' (' + m.xlsxTargets.slice(0, 3).join(', ') + ')' : ''}`, 'Наличие отдельного расчётно-графического контура']);
-  if (F.some(f => f.id === 'style:excel') && !res.styles.some(x => (x.category === 'webui' || x.category === 'hash') && (x.paras || x.runs))) hrows.push(['Таблицы из Excel', byId('style:excel').detail, 'Работа с собственными расчётными таблицами']);
-  hrows.push(['Структура исследования', `${fN(m.captionsTab)} таблиц, ${fN(m.captionsFig)} рисунков, ${fN(m.formulas)} формул, ${fN(m.appendices)} приложений`, 'Сложная сборка и форматирование']);
-  if (m.distinctRsids) hrows.push(['rsid', `${fN(m.distinctRsids)} уникальных идентификаторов редактирования`, 'Множественные операции изменения и вставки']);
-  if (byId('comp:notes')) hrows.push(['Рабочие заметки', `${fN(byId('comp:notes').value)} заметок`, 'Незавершённость и ручная сборка']);
-  if (m.comments || m.insertions || m.deletions) hrows.push(['Рецензирование', `${fN(m.comments)} комментариев, ${fN((m.insertions || 0) + (m.deletions || 0))} исправлений`, 'Следы совместной правки']);
+  if (F.some(f => f.id === 'style:excel') && !res.styles.some(x => (x.category === 'webui' || x.category === 'hash') && (x.paras || x.runs))) hrows.push(['Таблицы из Excel', byId('style:excel').detail, 'Вставка данных из Excel; происхождение расчётов неизвестно']);
+  hrows.push(['Структура исследования', `${fN(m.captionsTab)} таблиц, ${fN(m.captionsFig)} рисунков, ${fN(m.formulas)} формул, ${fN(m.appendices)} приложений`, 'Наличие структурных элементов без подтверждения автора']);
+  if (m.distinctRsids) hrows.push(['rsid', `${fN(m.distinctRsids)} уникальных идентификаторов редактирования`, 'Служебные отметки изменений, не идентифицирующие автора']);
+  if (byId('comp:notes')) hrows.push(['Рабочие заметки', `${fN(byId('comp:notes').value)} заметок`, 'Остатки рабочего редактирования']);
+  if (m.comments || m.insertions || m.deletions) hrows.push(['Рецензирование', `${fN(m.comments)} комментариев, ${fN((m.insertions || 0) + (m.deletions || 0))} исправлений`, 'Следы комментариев и правок; участники не устанавливаются']);
   out.push(table([['Признак', 'Фактическое содержание', 'Значение'], ...hrows], [2400, 4200, 2755], { header: true }));
-  out.push(P(res.human.length && (s.counts.strong || s.counts.medium) ? 'Совокупность этих данных исключает представление о документе как о едином ответе чат-бота, целиком вставленном в Word. Наиболее вероятно, что человек формировал структуру исследования, собирал данные, выполнял расчёты, создавал таблицы и схемы, а генеративный ИИ использовался для подготовки отдельных формулировок, систематизации, классификаций или описания результатов. Технически невозможно определить, какие идеи принадлежали автору, а какие были предложены моделью.' : 'Признаки человеческого участия учитываются при квалификации документа.'));
+  out.push(P('Перечисленные элементы описывают устройство и редактирование файла. Они совместимы как с работой человека, так и с программной сборкой и участием ИИ. Их нельзя использовать для подтверждения самостоятельного авторства или объявлять документ «гибридным» без внешних доказательств.'));
 
   /* ---------- 6 ---------- */
   out.push(H1('6. Альтернативные объяснения и оценка их вероятности'));
@@ -255,7 +255,7 @@ async function buildReportDocx(res) {
   out.push(H1('9. Рекомендации'));
   const pagesOf = id => { const f = byId(id); return f ? [...new Set((f.examples || []).map(e => (e.text.match(/^с\. \d+/) || [])[0]).filter(Boolean))].slice(0, 8).join(', ') : ''; };
   out.push(...NUM(['Сохранить исследованный файл без изменений вместе с контрольной суммой; исправления вносить только в копию.',
-    s.localization && s.localization.length ? `Переработать и заново сформулировать содержание блоков с веб-разметкой: ${s.localization.slice(0, 6).map(l => l.where.replace(/ — .*/, '') + ' (' + l.pages + ')').join('; ')}.` : null,
+    s.localization && s.localization.length ? `Проверить происхождение фрагментов с веб-разметкой и корректность ссылок на источники: ${s.localization.slice(0, 6).map(l => l.where.replace(/ — .*/, '') + ' (' + l.pages + ')').join('; ')}.` : null,
     byId('alien') ? `Проверить и адаптировать предметно-чужеродные фрагменты: ${pagesOf('alien')}.` : null,
     byId('citations') ? `Выполнить постраничную сверку с первоисточниками мест, где утверждения идут без ссылки или автор не совпадает с источником: ${pagesOf('citations')}.` : null,
     byId('numdup') ? 'Подтвердить первичными данными (анкетами, расчётными таблицами) совпадающие числовые структуры и независимо воспроизвести расчёты.' : null,
@@ -273,7 +273,7 @@ async function buildReportDocx(res) {
     out.push(P(`Абзацев с признаками: ${fN(zone.length)}. Приведены первые ${Math.min(zone.length, 200)} в порядке следования.`));
     out.push(table([['Абз.', 'Стр.', 'Место', 'Признаки', 'Начало абзаца'], ...zone.slice(0, 200).map(p => [String(p.i + 1), p.page ? String(p.page) : '', p.table != null ? tableLabel(res, p.table) : p.section.slice(0, 40), [...new Set(p.flags.filter(f => f.level !== 'info').map(f => f.label))].slice(0, 3).join('; '), snippet(p.text, null, 90)])], [650, 650, 1700, 3100, 3255], { header: true }));
   } else out.push(P('Абзацев с признаками нет.'));
-  out.push(para(`Заключение сформировано автоматически программой «Проверка DOCX на признаки ИИ» v${APP_VERSION} ${res.date.toLocaleString('ru-RU')}. Результаты носят вероятностный характер и подлежат оценке специалистом.`, { style: 'Small' }));
+  out.push(para(`Отчёт сформирован автоматически программой «Проверка DOCX на признаки ИИ» v${APP_VERSION} ${res.date.toLocaleString('ru-RU')}. Признаки не доказывают авторство или генерацию и требуют независимой экспертной оценки.`, { style: 'Small' }));
 
   const body = out.join('');
   const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -288,6 +288,6 @@ async function buildReportDocx(res) {
   z.file('word/numbering.xml', numberingXml());
   z.file('word/footer1.xml', footer);
   const iso = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-  z.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Заключение о признаках применения ИИ — ${X(res.file.name)}</dc:title><dc:creator>Проверка DOCX на признаки ИИ v${APP_VERSION}</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${iso}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${iso}</dcterms:modified></cp:coreProperties>`);
+  z.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Предварительный аудит DOCX — ${X(res.file.name)}</dc:title><dc:creator>Проверка DOCX на признаки ИИ v${APP_VERSION}</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${iso}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${iso}</dcterms:modified></cp:coreProperties>`);
   return await z.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 }
