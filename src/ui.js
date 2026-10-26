@@ -30,14 +30,14 @@ function render(r) {
   $('#verdict').className = 'verdict ' + vClass;
   $('#verdict').innerHTML = `
     <div class="v-head"><div><div class="eyebrow">Итоговая оценка</div><h2>${esc(v.text)}</h2></div>
-      ${v.confidence !== '—' ? `<div class="conf">уверенность<br><b>${esc(v.confidence)}</b></div>` : ''}</div>
-    <p>${v.mainSource ? `Наиболее вероятный источник по техническим следам: <b>${esc(v.mainSource)}</b>. Характер использования: ${esc(v.scale)}.` : 'Разметки веб-интерфейсов нейросетей в тексте не найдено.'}</p>
-    ${r.human.length ? `<p class="muted">Признаки самостоятельной работы: ${esc(r.human.join(', '))}.</p>` : ''}
+      ${v.evidence !== 'не выявлены' ? `<div class="conf">характер признаков<br><b>${esc(v.evidence)}</b></div>` : ''}</div>
+    <p>${v.mainSource ? `Разметка, сходная с оформлением:  <b>${esc(v.mainSource)}</b>. Охват разметки: ${esc(v.scale)}.` : 'Разметки веб-интерфейсов нейросетей в тексте не найдено.'}</p>
+    ${r.human.length ? `<p class="muted">Структура и следы редактирования:  ${esc(r.human.join(', '))}.</p>` : ''}
     <p class="muted small">Файл: ${esc(r.file.name)} · ${fmtNum(r.file.size)} байт · SHA-256 <code>${r.file.sha256}</code></p>`;
 
   $('#kpis').innerHTML = [
-    ['Текст с разметкой веб-интерфейса', r.kind === 'docx' ? fmtPct(s.markedShare || 0) : '—', r.kind === 'docx' ? `${fmtNum(s.markedBodyWords || 0)} из ${fmtNum(s.bodyWords)} слов основного текста` : 'для .txt не определяется'],
-    ['Сильные признаки', s.counts.strong, 'прямые следы ИИ'],
+    ['Текст с разметкой веб-интерфейса', r.kind === 'docx' ? fmtPct(s.markedShare || 0) : '—', r.kind === 'docx' ? `${fmtNum(s.markedBodyWords || 0)} из ${fmtNum(s.bodyWords)} слов основного текста` : 'для текстовых файлов не определяется'],
+    ['Сильные признаки', s.counts.strong, 'маркеры, требующие проверки'],
     ['Средние признаки', s.counts.medium, 'косвенные технические'],
     ['Слабые признаки', s.counts.weak, 'статистические, неспецифичные'],
   ].map(([t, n, d]) => `<div class="kpi"><div class="kpi-t">${t}</div><div class="kpi-n">${n}</div><div class="kpi-d">${esc(d)}</div></div>`).join('');
