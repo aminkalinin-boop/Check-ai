@@ -395,6 +395,23 @@ async function buildReportDocx(res) {
       'Исходные статьи и тексты диссертации не входят в публичную базу. Каталог не является обученной моделью и не раскрывает закрытый алгоритм «Антиплагиата».'));
   }
 
+  // Independent author/editorial checklist from user's 18.10.2026 rules.
+  if (res.stats.authorGuidelines) {
+    const a=res.stats.authorGuidelines;
+    out.push(H1('Приложение. Авторский стандарт научной статьи 5.2.3'));
+    out.push(P('Источник: '+a.source+'. Проанализировано абзацев: '+a.paragraphsReviewed+
+      '; проверок: '+a.ruleCount+'; абзацев с рекомендациями: '+a.paragraphsWithNotes+
+      '; замечаний: '+a.matches+'.'));
+    out.push(P(a.limits+' Проверки не участвуют в оценке происхождения текста и не раскрывают механизм внешних детекторов.'));
+    for (const e of a.examples.slice(0,60)) {
+      out.push(H2('Абзац №'+(e.para+1)+': '+e.title));
+      out.push(P('Точное выражение: «'+e.quote+'»; раздел правил: '+e.section+'.'));
+      out.push(P('Научно-редакторская проблема: '+e.reason));
+      out.push(P('Что проверить и уточнить: '+e.action));
+    }
+    if(a.examples.length>60)out.push(P('В выгрузку включены первые 60 замечаний; полный перечень доступен в интерактивной вкладке «База признаков».'));
+  }
+
   out.push(para(`Заключение сформировано автоматически программой «Проверка DOCX на признаки ИИ» v${APP_VERSION} ${res.date.toLocaleString('ru-RU')}. Результаты носят вероятностный характер и подлежат оценке специалистом.`, { style: 'Small' }));
 
   const body = out.join('');
