@@ -30,7 +30,7 @@ function render(r) {
   $('#verdict').className = 'verdict ' + vClass;
   $('#verdict').innerHTML = `
     <div class="v-head"><div><div class="eyebrow">Итоговая оценка</div><h2>${esc(v.text)}</h2></div>
-      ${v.confidence !== '—' ? `<div class="conf">уверенность<br><b>${esc(v.confidence)}</b></div>` : ''}</div>
+      ${v.confidence !== '—' ? `<div class="conf">оценка признаков<br><b>${esc(v.confidence)}</b></div>` : ''}</div>
     <p>${v.mainSource ? `Наиболее вероятный источник по техническим следам: <b>${esc(v.mainSource)}</b>. Характер использования: ${esc(v.scale)}.` : 'Разметки веб-интерфейсов нейросетей в тексте не найдено.'}</p>
     ${r.human.length ? `<p class="muted">Признаки самостоятельной работы: ${esc(r.human.join(', '))}.</p>` : ''}
     <p class="muted small">Файл: ${esc(r.file.name)} · ${fmtNum(r.file.size)} байт · SHA-256 <code>${r.file.sha256}</code></p>`;
