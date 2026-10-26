@@ -2524,6 +2524,19 @@ function referenceRunText(run) {
 }
 function referenceRuns(paragraph) {
   const result = [];
+  // Word allows direct text highlighting, run shading and whole-paragraph or
+  // cell shading. These are recorded as external annotations, never AI proof.
+  const paraPr = childW(paragraph, 'pPr');
+  const paraShade = childW(paraPr, 'shd');
+  let cellShade = null, ancestor = paragraph.parentNode;
+  while (ancestor && ancestor.localName !== 'body') {
+    if (ancestor.namespaceURI === W_NS && ancestor.localName === 'tc') {
+      cellShade = childW(childW(ancestor, 'tcPr'), 'shd');
+      break;
+    }
+    ancestor = ancestor.parentNode;
+  }
+  const inheritedFill = wAttr(paraShade, 'fill') || wAttr(cellShade, 'fill');
   const walk = parent => {
     for (const ch of parent.children || []) {
       if (ch.namespaceURI === MC_NS && ch.localName === 'Fallback') continue;
@@ -2535,7 +2548,7 @@ function referenceRuns(paragraph) {
         const hi = childW(prop, 'highlight');
         const sh = childW(prop, 'shd');
         const color = hi ? wAttr(hi, 'val') : null;
-        const fill = sh ? wAttr(sh, 'fill') : null;
+        const fill = (sh ? wAttr(sh, 'fill') : null) || inheritedFill;
         result.push({ text: t, highlight: color, fill });
       } else walk(ch);
     }
