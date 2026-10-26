@@ -3,7 +3,7 @@ from pathlib import Path
 root = Path(__file__).parent
 t = (root / 'src/template.html').read_text(encoding='utf8')
 jz = (root / 'vendor/jszip.min.js').read_text(encoding='utf8')
-order = ['analyzer.js', 'content.js', 'stylometry.js', 'extra.js', 'robustness.js', 'report_docx.js', 'report2.js', 'annotate.js', 'platform.js', 'ui.js']
+order = ['analyzer.js', 'content.js', 'stylometry.js', 'extra.js', 'robustness.js', 'academic_audit.js', 'report_docx.js', 'report2.js', 'annotate.js', 'platform.js', 'ui.js']
 app = '\n'.join((root / 'src' / f).read_text(encoding='utf8') for f in order)
 app += '\n' + (root / 'online' / 'online_addon.js').read_text(encoding='utf8')
 assert '</script' not in jz.lower() and '</script' not in app.lower()

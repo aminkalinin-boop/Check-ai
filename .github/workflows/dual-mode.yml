@@ -21,8 +21,9 @@ jobs:
           node --check online/online_addon.js
           node --check online/server.mjs
           node --check src/robustness.js
+          node --check src/academic_audit.js
       - name: Check countermeasure diagnostics
-        run: node --test tests/robustness.test.cjs
+        run: node --test tests/robustness.test.cjs tests/academic_audit.test.cjs
       - name: Create both builds and published page
         run: |
           python3 build.py
