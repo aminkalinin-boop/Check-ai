@@ -34,6 +34,7 @@ function sourceWithMocks() {
   const script='const CHECK_AI_MARKER_KB='+JSON.stringify(evidence)+';\n'+
     fs.readFileSync(path.join(__dirname,'..','src','linguistic_diagnostics.js'),'utf8')+'\n'+
     fs.readFileSync(path.join(__dirname,'..','src','knowledge_integration.js'),'utf8')+'\n'+
+    fs.readFileSync(path.join(__dirname,'..','src','author_guidelines.js'),'utf8')+'\n'+
     fs.readFileSync(path.join(__dirname,'..','src','reference_highlights.js'),'utf8');
   const ctx={ W_NS:W, MC_NS:MC, childW:(node,name)=>(node?.children||[]).find(x=>x.localName===name&&x.namespaceURI===W)||null,
     wAttr:(node,name)=>node?.attrs?.[name]||null,
@@ -56,7 +57,9 @@ test('Magenta highlight selects EXACT run text without neighboring words',()=>{
   assert.equal(out.fragments[0].text,'Таким образом,');
   assert.equal(out.fragments[0].start,3);
   assert.equal(out.fragments[0].paragraph,1);
-  assert.equal(out.fragments[0].category,'Заключительная конструкция');
+  assert.match(out.fragments[0].category,/Авторский стандарт/);
+  assert.match(out.fragments[0].reason,/не объяснение внутреннего решения/);
+  assert.equal(out.fragments[0].diagnostic.authorGuideline.exact[0].quote,'Таким образом');
   assert.equal(out.fragments[0].flags[0].level,'weak');
   assert.equal(out.fragments[1].inTable,true);
   assert.equal(out.fragments[1].text,'Данные');
