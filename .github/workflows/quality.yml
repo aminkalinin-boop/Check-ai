@@ -1,0 +1,24 @@
+name: Check-AI quality checks
+
+on:
+  push:
+    branches: [main, 'improve/**']
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate verdict behavior
+        run: node --test tests/verdict.test.cjs
+      - name: Rebuild static application
+        run: python3 build.py
+      - name: Ensure generated index.html is committed
+        run: git diff --exit-code -- index.html
