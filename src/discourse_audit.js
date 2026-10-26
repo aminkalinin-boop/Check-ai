@@ -7,12 +7,12 @@ function discourseAuditChecks(res) {
   const totalWords = ps.reduce((n, p) => n + p.words, 0);
   const examples = [];
   const contrastPatterns = [
-    /не\s+только\b[^.!?;\n]{1,170}?\bно\s+и\b/giu,
-    /не\s+столько\b[^.!?;\n]{1,170}?\bсколько\b/giu,
-    /не\s+просто\b[^.!?;\n]{1,170}?\bа\b/giu,
-    /\bхотя\b[^.!?;\n]{1,170}?\b(?:однако|тем\s+не\s+менее)\b/giu,
-    /\bдело\s+не\s+в\b[^.!?;\n]{1,170}?\bа\s+в\b/giu,
-    /\bречь\s+ид[её]т\s+не\s+о\b[^.!?;\n]{1,170}?\bа\s+о\b/giu
+    /не\s+только[^.!?;\n]{1,170}?\bно\s+и/giu,
+    /не\s+столько[^.!?;\n]{1,170}?\bсколько/giu,
+    /не\s+просто[^.!?;\n]{1,170}?а/giu,
+    /хотя[^.!?;\n]{1,170}?(?:однако|тем\s+не\s+менее)/giu,
+    /дело\s+не\s+в[^.!?;\n]{1,170}?а\s+в/giu,
+    /речь\s+ид[её]т\s+не\s+о[^.!?;\n]{1,170}?а\s+о/giu
   ];
   let contrastCount = 0;
   const contrastBySection = {};
@@ -57,7 +57,7 @@ function discourseAuditChecks(res) {
   let eligibleTails = 0, repeatedTails = 0;
   for (const p of ps) {
     const sent = p.text.split(/(?<=[.!?…])\s+(?=[А-ЯЁA-Z«“])/u).map(x => x.trim()).filter(Boolean);
-    if (sent.length < 3 || p.words < 35) continue;
+    if (sent.length < 3 || p.words < 25) continue;
     const first = sent.slice(0, -1).join(' '), tail = sent[sent.length - 1];
     if (tail.length < 25) continue;
     eligibleTails++;
@@ -86,9 +86,9 @@ function discourseAuditChecks(res) {
   // Narrowly scoped scientific terminology comparison: exact phrase pairs,
   // not a claim that one is always invalid, and not generalized to authorship.
   const termPairs = [
-    ['человеческий капитал', 'людской капитал', /\bчеловеческ\w*\s+капитал\w*/giu, /\bлюдск\w*\s+капитал\w*/giu],
-    ['методология исследования', 'методика исследования', /\bметодологи\w*\s+исследовани\w*/giu, /\bметодик\w*\s+исследовани\w*/giu],
-    ['компетенция', 'компетентность', /\bкомпетенци\w*/giu, /\bкомпетентност\w*/giu]
+    ['человеческий капитал', 'людской капитал', /человеческ[\p{L}]*\s+капитал[\p{L}]*/giu, /людск[\p{L}]*\s+капитал[\p{L}]*/giu],
+    ['методология исследования', 'методика исследования', /методологи[\p{L}]*\s+исследовани[\p{L}]*/giu, /методик[\p{L}]*\s+исследовани[\p{L}]*/giu],
+    ['компетенция', 'компетентность', /компетенци[\p{L}]*/giu, /компетентност[\p{L}]*/giu]
   ];
   const termsToReview = [];
   for (const [first, second, reA, reB] of termPairs) {
@@ -113,7 +113,7 @@ function discourseAuditChecks(res) {
     ]).slice(0, 6)
   });
 
-  const standardRe = /\b(?:ЦУР|SDG)[-\s№]*(?:\d{1,2})?\b|(?:Цел[иь]\s+устойчивого\s+развития)|\bГОСТ(?:\s+[Рr])?\s*[\d][\d.\-–]*|\bISO\s*\d{3,6}\b|\bФГОС\b/giu;
+  const standardRe = /(?<![\p{L}\p{N}])(?:ЦУР|SDG)[-\s№]*(?:\d{1,2})?\b|(?:Цел[иь]\s+устойчивого\s+развития)|(?<![\p{L}\p{N}])ГОСТ(?:\s+[Рr])?\s*[\d][\d.\-–]*|(?<![\p{L}\p{N}])ISO\s*\d{3,6}\b|(?<![\p{L}\p{N}])ФГОС(?![\p{L}\p{N}])/giu;
   let standardCount = 0;
   const standardsExamples = [];
   for (const p of ps) {
