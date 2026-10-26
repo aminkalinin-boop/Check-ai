@@ -43,3 +43,17 @@ test('Length 600+ is reserved for existing long-form stylometry', () => {
   const { result } = make(['Данные научного исследования уточняют показатели и результаты. '.repeat(120)]);
   assert.equal(result, null);
 });
+
+test('Table-dominant short DOCX is included in the descriptive audit', () => {
+  const p = (text, i, inTable) => ({ i, text, inTable, words: (text.match(/[\p{L}\p{N}]+/gu) || []).length, flags: [], toc: false, bib: false, inBox: false, heading: false });
+  const bodyText = 'Исследование показывает условия и ограничения, но данных недостаточно для заключения.';
+  const cell = 'Методический анализ показателей инвестиций: исходные данные недостаточны для выводов, расчёт эффективности невозможен. ';
+  const paras = [p(bodyText, 0, false), ...Array.from({length: 5},(_,i)=>p(cell.repeat(4), i+1, true))];
+  const result = { paras, findings: [], stats: {} };
+  const observed = box.audit(result, [paras[0]]);
+  assert.ok(observed);
+  assert.equal(observed.tableDominant, true);
+  assert.ok(observed.tableWords >= 80);
+  assert.ok(paras.some(x=>x.inTable && x.flags.some(f=>f.type==='short' && f.level==='info')));
+  assert.equal(result.findings.filter(f=>f.level!=='info').length, 0);
+});
