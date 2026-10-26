@@ -5,8 +5,11 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const root = path.join(__dirname, '..');
-const helper = fs.readFileSync(path.join(root, 'src', 'linguistic_diagnostics.js'), 'utf8') +
-  '\n' + fs.readFileSync(path.join(root, 'src', 'annotation_guidance.js'), 'utf8');
+const kb=JSON.parse(fs.readFileSync(path.join(root,'data','marker_evidence.json'),'utf8'));
+const helper='const CHECK_AI_MARKER_KB='+JSON.stringify(kb)+';\n'+
+  fs.readFileSync(path.join(root,'src','linguistic_diagnostics.js'),'utf8')+'\n'+
+  fs.readFileSync(path.join(root,'src','knowledge_integration.js'),'utf8')+'\n'+
+  fs.readFileSync(path.join(root,'src','annotation_guidance.js'),'utf8');
 const mark = fs.readFileSync(path.join(root, 'src', 'annotate.js'), 'utf8');
 const ui = fs.readFileSync(path.join(root, 'src', 'ui.js'), 'utf8');
 const box = {};
