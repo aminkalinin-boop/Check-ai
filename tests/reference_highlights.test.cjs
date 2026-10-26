@@ -94,3 +94,14 @@ test('Manual markup report and DOCX comments are independent extensions',()=>{
   assert.match(anno,/Действие по проверке внешнего выделения/);
   assert.match(anno,/Do not erase colors/);
 });
+
+test('Paragraph shading and cell shading are recognized as manual selections', () => {
+  const shadedP=p(el('pPr',[el('shd',[],{fill:'7030A0'})]),run('Весь абзац выделен.'));
+  const shadedCell=el('tc',[el('tcPr',[el('shd',[],{fill:'D8B4FE'})]),p(run('Ячейка тоже выделена.'))]);
+  const body=el('body',[shadedP,el('tbl',[el('tr',[shadedCell])])]);
+  const r=makeRes(['Весь абзац выделен.','Ячейка тоже выделена.']);
+  const out=ctx.review(r,body,'purple');
+  assert.equal(out.fragments.length,2);
+  assert.equal(out.fragments[0].text,'Весь абзац выделен.');
+  assert.equal(out.fragments[1].text,'Ячейка тоже выделена.');
+});
