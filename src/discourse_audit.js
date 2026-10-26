@@ -7,12 +7,12 @@ function discourseAuditChecks(res) {
   const totalWords = ps.reduce((n, p) => n + p.words, 0);
   const examples = [];
   const contrastPatterns = [
-    /не\s+только[^.!?;\n]{1,170}?\bно\s+и/giu,
-    /не\s+столько[^.!?;\n]{1,170}?\bсколько/giu,
-    /не\s+просто[^.!?;\n]{1,170}?а/giu,
+    /не\s+только[^.!?;\n]{1,170}?\s+но\s+и/giu,
+    /не\s+столько[^.!?;\n]{1,170}?\s+сколько/giu,
+    /не\s+просто[^.!?;\n]{1,170}?\s+а\s+/giu,
     /хотя[^.!?;\n]{1,170}?(?:однако|тем\s+не\s+менее)/giu,
-    /дело\s+не\s+в[^.!?;\n]{1,170}?а\s+в/giu,
-    /речь\s+ид[её]т\s+не\s+о[^.!?;\n]{1,170}?а\s+о/giu
+    /дело\s+не\s+в[^.!?;\n]{1,170}?\s+а\s+в/giu,
+    /речь\s+ид[её]т\s+не\s+о[^.!?;\n]{1,170}?\s+а\s+о/giu
   ];
   let contrastCount = 0;
   const contrastBySection = {};
