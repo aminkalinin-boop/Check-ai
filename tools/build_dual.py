@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src"
 ORDER = [
     "analyzer.js", "content.js", "stylometry.js", "extra.js",
-    "report_docx.js", "report2.js", "annotate.js", "platform.js", "ui.js"
+    "robustness.js", "report_docx.js", "report2.js", "annotate.js", "platform.js", "ui.js"
 ]
 
 
@@ -41,12 +41,15 @@ def main():
     if "fonts.googleapis.com" in offline:
         raise ValueError("Offline build retains an external font request")
 
+    # The online build is identical to root index.html: shared app code plus
+    # optional add-on injected into the same script by the original build flow.
+    template = (SOURCE / "template.html").read_text(encoding="utf-8")
+    jszip = (ROOT / "vendor" / "jszip.min.js").read_text(encoding="utf-8")
     addon = (ROOT / "online" / "online_addon.js").read_text(encoding="utf-8")
+    js = "\n".join((SOURCE / name).read_text(encoding="utf-8") for name in ORDER) + "\n" + addon
     if "</script" in addon.lower():
         raise ValueError("Unsafe closing script tag in online add-on")
-    if core.count("</body>") != 1:
-        raise ValueError("Unexpected core HTML structure")
-    online = core.replace("</body>", "<script>\n" + addon + "\n</script>\n</body>")
+    online = template.replace("/*JSZIP*/", jszip).replace("/*APP*/", js)
 
     (out_offline / "index.html").write_text(offline, encoding="utf-8")
     (out_online / "index.html").write_text(online, encoding="utf-8")
