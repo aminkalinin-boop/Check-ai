@@ -73,6 +73,7 @@ function referenceAdvice(p, snippet, ownFlags) {
   // containing paragraph for rhythm; report their scopes separately.
   const d=scientificParagraphDiagnosis(p.text,snippet,p);
   const primary=bestScientificSignal(d);
+  const kb=primary?knowledgeSourceEntry(primary.id):null;
   const usable=d.signals.filter(x=>x.id!=='not-identified');
   const detail=usable.slice(0,4).map(x=>({
     marker:x.title,evidence:x.evidence,reason:x.interpretation,action:x.action,scope:x.scope
@@ -83,7 +84,7 @@ function referenceAdvice(p, snippet, ownFlags) {
   return {
     category,
     problem:primary?.evidence||'Нет измеримого локального маркера.',
-    reason:primary?.interpretation||'Внутренние признаки независимы от внешней подсветки.',
+    reason:(primary?.interpretation||'Внутренние признаки независимы от внешней подсветки.') + (kb ? ' База знаний: ' + kb.title + '; статус ' + kb.evidence_status + '; проверяемые источники ' + kb.source_ids.join(', ') + '. ' + kb.interpretation : ''),
     action:primary?.action||'Сверьте научные утверждения с источниками и контекстом.',
     diagnostic: { signals:detail,metrics:d.metric,hasLocalLinguisticEvidence:hasBodyEvidence,
       specificity: 'Описание измеряемых языковых особенностей, не реконструкция закрытого алгоритма Антиплагиата' }
