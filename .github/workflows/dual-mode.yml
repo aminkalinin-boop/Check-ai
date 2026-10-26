@@ -25,6 +25,9 @@ jobs:
           node --check src/discourse_audit.js
           node --check src/provenance_fairness.js
           node --check src/offline_engine.js
+          node --check src/short_text_audit.js
+          node --check src/annotation_guidance.js
+          node --test tests/short_text_audit.test.cjs tests/annotation_guidance.test.cjs
           node --check online/site_config.js
           node --test tests/offline_engine.test.cjs tests/mode_pipeline.test.cjs
       - name: Check countermeasure diagnostics
