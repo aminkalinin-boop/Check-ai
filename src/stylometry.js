@@ -38,7 +38,11 @@ function stylometry(res) {
   const text = body.map(p => p.text).join('\n');
   const W = (text.toLowerCase().replace(/ё/g, 'е').match(/\p{L}+(?:-\p{L}+)*/gu) || []);
   const n = W.length;
-  if (n < 600) { res.stats.stylometry = null; return; }
+  if (n < 600) {
+    res.stats.stylometry = null; // no calibrated long-form score on short papers
+    shortTextAudit(res, body);  // exploratory, no unsupported AI attribution
+    return;
+  }
   const per = c => 1000 * c / n;
   const rows = [];
   const count = (re) => { re.lastIndex = 0; return (text.match(re) || []).length; };
