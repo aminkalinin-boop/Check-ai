@@ -172,6 +172,31 @@ function render(r) {
       '<p class="muted small">Текстов исторических статей в публичном репозитории нет. Показатели одного автора не представляют всего научного сообщества.</p>';
   }
 
+  // Авторский стандарт отображается отдельно от вероятностных признаков.
+  const A=s.authorGuidelines;
+  if(A){
+    const titles={formula:'Риторические формулы',language:'Стиль автора',term:'Экономические термины',method:'Проверка методики'};
+    $('#knowledge').insertAdjacentHTML('beforeend',
+      '<h3>Авторский стандарт статьи 5.2.3 (18.10.2026)</h3>'+
+      '<p class="muted small">'+esc(A.source)+'. '+esc(A.limits)+
+      ' Это индивидуальные рекомендации: они НЕ повышают число сильных/средних/слабых признаков и не меняют вывод Check-AI.</p>'+
+      '<div class="kpis">'+[
+        ['Редакторских правил',A.ruleCount,'конкретные шаблоны'],
+        ['Абзацев проверено',A.paragraphsReviewed,'без библиографии, таблиц и заголовков'],
+        ['Абзацев с замечаниями',A.paragraphsWithNotes,'не доля ИИ'],
+        ['Локальных совпадений',A.matches,'справочные замечания']
+      ].map(([t,n,d])=>'<div class="kpi"><div class="kpi-t">'+esc(t)+'</div><div class="kpi-n">'+n+
+        '</div><div class="kpi-d">'+esc(d)+'</div></div>').join('')+'</div>'+
+      '<p class="muted small">'+Object.entries(A.byKind).map(([k,v])=>esc(titles[k]||k)+': '+v).join('; ')+'.</p>'+
+      (A.examples.length?'<h4>Предметные замечания по месту в тексте</h4>'+
+        '<table><thead><tr><th>Место и точная конструкция</th><th>Диагностика</th><th>Что проверить</th></tr></thead><tbody>'+
+        A.examples.slice(0,70).map(e=>'<tr><td><a class="goto" href="#" data-i="'+e.para+'">абз. №'+(e.para+1)+
+          '</a><p><b>'+esc(e.quote)+'</b> · '+esc(e.section)+'</p></td><td>'+esc(e.title)+
+          '<p class="muted small">'+esc(e.reason)+'</p></td><td>'+esc(e.action)+'</td></tr>').join('')+'</tbody></table>'+
+        (A.examples.length>70?'<p class="muted">Выведены первые 70 замечаний; сводка и примеры входят в Word-отчёт.</p>':''):
+        '<p class="muted">По встроенным точным шаблонам авторского стандарта замечаний нет.</p>'));
+  }
+
   // фильтр абзацев
   const types = new Map();
   r.paras.forEach(p => p.flags.forEach(f => { const k = f.label.replace(/«[^»]*»$/, '').replace(/№\d+/, '').replace(/сноске \d+/, 'сноске').trim(); types.set(k, (types.get(k) || 0) + 1); }));
