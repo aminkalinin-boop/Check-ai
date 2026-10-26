@@ -100,7 +100,7 @@ test('Paragraph shading and cell shading are recognized as manual selections', (
   const shadedCell=el('tc',[el('tcPr',[el('shd',[],{fill:'D8B4FE'})]),p(run('Ячейка тоже выделена.'))]);
   const body=el('body',[shadedP,el('tbl',[el('tr',[shadedCell])])]);
   const r=makeRes(['Весь абзац выделен.','Ячейка тоже выделена.']);
-  const out=ctx.review(r,body,'purple');
+  const out=ctx.review(r,el('document',[body]),'purple');
   assert.equal(out.fragments.length,2);
   assert.equal(out.fragments[0].text,'Весь абзац выделен.');
   assert.equal(out.fragments[1].text,'Ячейка тоже выделена.');
