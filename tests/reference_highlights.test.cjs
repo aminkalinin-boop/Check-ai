@@ -30,8 +30,11 @@ function makeRes(paras) {
   })) };
 }
 function sourceWithMocks() {
-  const script=fs.readFileSync(path.join(__dirname,'..','src','linguistic_diagnostics.js'),'utf8') +
-    '\n' + fs.readFileSync(path.join(__dirname,'..','src','reference_highlights.js'),'utf8');
+  const evidence=JSON.parse(fs.readFileSync(path.join(__dirname,'..','data','marker_evidence.json'),'utf8'));
+  const script='const CHECK_AI_MARKER_KB='+JSON.stringify(evidence)+';\n'+
+    fs.readFileSync(path.join(__dirname,'..','src','linguistic_diagnostics.js'),'utf8')+'\n'+
+    fs.readFileSync(path.join(__dirname,'..','src','knowledge_integration.js'),'utf8')+'\n'+
+    fs.readFileSync(path.join(__dirname,'..','src','reference_highlights.js'),'utf8');
   const ctx={ W_NS:W, MC_NS:MC, childW:(node,name)=>(node?.children||[]).find(x=>x.localName===name&&x.namespaceURI===W)||null,
     wAttr:(node,name)=>node?.attrs?.[name]||null,
     hasAncestor:(node,ns,name,stop)=>{let x=node.parentNode;while(x&&x!==stop){if(x.namespaceURI===ns&&x.localName===name)return true;x=x.parentNode;}return false;}
