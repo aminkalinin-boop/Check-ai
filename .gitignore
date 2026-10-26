@@ -5,3 +5,5 @@ private/
 *.doc
 *.pdf
 __pycache__/
+# Build artifacts for both optional deployment modes
+/dist/
