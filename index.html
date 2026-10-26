@@ -2771,6 +2771,26 @@ function scientificParagraphDiagnosis(paragraphText, selectedText='', context={}
         'Это простая доля общих слов, не BERTScore и не оценка смыслового тождества.',
         'Сопоставьте последнее предложение с предыдущими тезисами. Если оно не добавляет вывода из фактов, уточните результат или устраните смысловой дубль; не удаляйте необходимое резюме.');
   }
+  // Repeated tri-grams are observable surface patterns, NOT calibrated PPL
+  // and NOT an attribution to a particular model or tokenization algorithm.
+  if(tokens.length>=70){
+    const sequences=new Map();
+    for(let i=0;i<=tokens.length-3;i++){
+      const slice=tokens.slice(i,i+3);
+      if(!slice.some(w=>w.length>=6))continue;
+      const key=slice.join(' ');
+      sequences.set(key,(sequences.get(key)||0)+1);
+    }
+    const repeated=[...sequences].filter(([,n])=>n>=3).sort((a,b)=>b[1]-a[1]);
+    metric.repeatedTrigramTypes=repeated.length;
+    if(repeated.length){
+      const [phrase,n]=repeated[0];
+      add('ngram-repeat','Повторяющийся трёхсловный оборот',
+        'Сочетание «'+phrase+'» повторяется '+n+' раз(а); всего повторяющихся троек: '+repeated.length+'.',
+        'Повтор фразы может отражать фиксированную научную терминологию либо шаблонность. По одному n-граммному счётчику происхождение текста не устанавливается.',
+        'Проверьте контексты этих '+n+' употреблений. Сохраняйте устойчивый экономический термин, если он определён корректно; уберите только дублирующие объяснения или уточните конкретный показатель в каждом случае.');
+    }
+  }
   if(context.inTable) add('table-context','Фрагмент внутри таблицы',
     'Разметка расположена в ячейке таблицы Word.',
     'Текст ячейки не следует сравнивать с обычными абзацами без её строки, столбца и исходных данных.',
