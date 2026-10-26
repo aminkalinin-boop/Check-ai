@@ -203,7 +203,7 @@ function extractParagraphText(p, onFootnote) {
 }
 
 /* ================= ОСНОВНОЙ АНАЛИЗ ================= */
-async function analyzeFile(file, onProgress = () => {}) {
+async function analyzeFile(file, onProgress = () => {}, options = {}) {
   const buf = await file.arrayBuffer();
   onProgress('Контрольные суммы…');
   const res = {
@@ -294,6 +294,10 @@ async function analyzeFile(file, onProgress = () => {}) {
   provenanceFairnessChecks(res);
   finalize(res);
   recordOfflineAudit(res);
+  if (options.referenceHighlights) {
+    onProgress('Анализ ручной разметки…');
+    res.reference = collectReferenceHighlights(res, doc, options.referenceColor || 'purple');
+  }
   return res;
 }
 

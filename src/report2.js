@@ -293,6 +293,34 @@ async function buildReportDocx(res) {
     out.push(P(`Абзацев с признаками: ${fN(zone.length)}. Приведены первые ${Math.min(zone.length, 200)} в порядке следования.`));
     out.push(table([['Абз.', 'Стр.', 'Место', 'Признаки', 'Начало абзаца'], ...zone.slice(0, 200).map(p => [String(p.i + 1), p.page ? String(p.page) : '', p.table != null ? tableLabel(res, p.table) : p.section.slice(0, 40), [...new Set(p.flags.filter(f => f.level !== 'info').map(f => f.label))].slice(0, 3).join('; '), snippet(p.text, null, 90)])], [650, 650, 1700, 3100, 3255], { header: true }));
   } else out.push(P('Абзацев с признаками нет.'));
+  if (res.reference) {
+    const rr = res.reference;
+    out.push(H1('Приложение В. Ручные выделения из внешней проверки'));
+    out.push(P('Режим сопоставления с разметкой стороннего детектора. Цвет: ' + rr.mode +
+      '. Фрагментов: ' + fN(rr.fragments.length) +
+      '; затронутых абзацев: ' + fN(rr.markedParagraphs) +
+      '; последовательных зон: ' + fN(rr.contiguousAreas) + '.'));
+    out.push(P(rr.notice));
+    if (!rr.fragments.length) out.push(P('Отметок выбранного цвета не найдено. Проверьте реальный цвет выделения в документе Word.'));
+    for (const fragment of rr.fragments.slice(0, 2000)) {
+      out.push(H2('Выделение №' + fragment.id + ' — абзац ' + fragment.paragraph +
+        (fragment.page ? ', с. ' + fragment.page : '') + ' — ' + fragment.category));
+      out.push(P('Раздел: ' + fragment.section + (fragment.inTable ? ' (таблица)' : '')));
+      out.push(P('Точно выделенный текст: ' + fragment.text.slice(0, 3500) +
+        (fragment.text.length > 3500 ? ' [длинный фрагмент сокращён; оригинал остаётся в DOCX]' : '')));
+      if (fragment.contextualBefore || fragment.contextualAfter)
+        out.push(P('Ближайший контекст: ' + fragment.contextualBefore.slice(-150) +
+          ' [ВЫДЕЛЕНИЕ] ' + fragment.contextualAfter.slice(0, 150)));
+      out.push(P('Проблема: ' + fragment.problem));
+      out.push(P('Действие по проверке: ' + fragment.action));
+      const local = fragment.flags.filter(x => ['strong','medium','weak'].includes(x.level));
+      out.push(P('Независимые признаки Check-AI в пределах абзаца: ' +
+        (local.length ? local.map(x => '[' + x.level + '] ' + x.label).join('; ') : 'не установлены. Это расхождение с внешней разметкой, а не доказательство её ошибки.')));
+    }
+    if (rr.fragments.length > 2000)
+      out.push(P('Из-за объёма отчёта выведены первые 2000 фрагментов; исходные выделения сохранены в DOCX.'));
+  }
+
   out.push(para(`Заключение сформировано автоматически программой «Проверка DOCX на признаки ИИ» v${APP_VERSION} ${res.date.toLocaleString('ru-RU')}. Результаты носят вероятностный характер и подлежат оценке специалистом.`, { style: 'Small' }));
 
   const body = out.join('');

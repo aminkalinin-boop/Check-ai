@@ -110,6 +110,22 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
     <p>Анализ DOCX: разметка веб-интерфейсов нейросетей, скрытые символы, метаданные, остатки ответов чат-ботов, повторы, сноски и ссылки.</p>
   </header>
 
+  <div class="card" id="reference-controls" style="margin-bottom:12px">
+    <label style="display:flex;align-items:flex-start;gap:9px;font-weight:600;cursor:pointer">
+      <input type="checkbox" id="reference-enabled" style="margin-top:4px">
+      <span>Проверить заранее выделенные фрагменты из отчёта «Антиплагиат»</span>
+    </label>
+    <div class="muted small" style="margin:6px 0 10px">Предварительно выделите фрагменты цветом в исходном DOCX. Check-AI независимо проверит весь документ, затем отдельно разберёт ручную разметку по абзацам: проблема, действие, контекст и совпадение с собственными признаками.</div>
+    <label for="reference-color" class="muted small">Цвет выделения: </label>
+    <select id="reference-color" aria-label="Цвет ручной подсветки">
+      <option value="purple">Фиолетовый / пурпурный</option>
+      <option value="yellow">Жёлтый</option>
+      <option value="cyan">Голубой</option>
+      <option value="green">Зелёный</option>
+      <option value="all">Любой цвет подсветки</option>
+    </select>
+    <div class="muted small" style="margin-top:7px">Учитываются Word-маркер и заливка фрагмента; PDF и скриншоты нужно предварительно перенести в DOCX. Выделение не считается доказательством ИИ.</div>
+  </div>
   <div id="drop" class="drop" tabindex="0" role="button" aria-label="Выбрать файл">
     <b>Нажмите, чтобы выбрать файл .docx</b>
     <div class="muted">На компьютере файл можно перетащить сюда</div>
@@ -146,6 +162,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
       <button class="tab" data-tab="sections">По разделам</button>
       <button class="tab" data-tab="styles">Стили</button>
       <button class="tab" data-tab="meta">Метаданные</button>
+      <button class="tab" data-tab="reference" id="reference-tab" hidden>Разметка Антиплагиата</button>
     </div>
     <div class="pane" id="pane-findings"><div id="findings"></div></div>
     <div class="pane" id="pane-paras" hidden>
@@ -156,6 +173,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
     <div class="pane" id="pane-loc" hidden><div id="loc"></div></div>
     <div class="pane" id="pane-sections" hidden><div id="sections"></div></div>
     <div class="pane" id="pane-styles" hidden><div id="styles"></div></div>
+    <div class="pane" id="pane-reference" hidden><div id="reference-summary"></div><div id="reference-items"></div></div>
     <div class="pane" id="pane-meta" hidden><div id="meta"></div></div>
   </div>
 
@@ -379,7 +397,7 @@ function extractParagraphText(p, onFootnote) {
 }
 
 /* ================= ОСНОВНОЙ АНАЛИЗ ================= */
-async function analyzeFile(file, onProgress = () => {}) {
+async function analyzeFile(file, onProgress = () => {}, options = {}) {
   const buf = await file.arrayBuffer();
   onProgress('Контрольные суммы…');
   const res = {
@@ -470,6 +488,10 @@ async function analyzeFile(file, onProgress = () => {}) {
   provenanceFairnessChecks(res);
   finalize(res);
   recordOfflineAudit(res);
+  if (options.referenceHighlights) {
+    onProgress('Анализ ручной разметки…');
+    res.reference = collectReferenceHighlights(res, doc, options.referenceColor || 'purple');
+  }
   return res;
 }
 
@@ -2464,6 +2486,172 @@ function annotationAdvice(flag, para) {
   };
 }
 
+/* External/manual DOCX highlights: independent reference annotations.
+   A highlight is an external decision, NOT ground truth of AI authorship.
+   No changes to Check-AI legacy findings, paragraph flags or verdict.
+   The full original DOCX stays in the user's browser. */
+'use strict';
+
+const REFERENCE_COLORS = Object.freeze({
+  purple: { word: ['magenta', 'darkmagenta', 'violet', 'purple', 'pink'], fills: ['7030A0','800080','9932CC','A020F0','C000C0','E4DFEC','F2CEEF','D8B4FE','DDA0DD','FF00FF'] },
+  yellow: { word: ['yellow', 'darkyellow'], fills: ['FFFF00','FFF2CC','FFEB9C','FFFF99'] },
+  cyan: { word: ['cyan', 'darkcyan', 'blue', 'lightblue'], fills: ['00FFFF','B4C6E7','DDEBF7','BDD7EE'] },
+  green: { word: ['green', 'darkgreen', 'brightgreen'], fills: ['00FF00','C6E0B4','E2F0D9','92D050'] }
+});
+function referenceColor(kind, color, wanted) {
+  const normalized = String(color || '').replace(/^#/, '').replace(/\s/g, '').toUpperCase();
+  if (!normalized || normalized === 'AUTO' || normalized === 'NONE') return false;
+  if (wanted === 'all') return true;
+  const sets = REFERENCE_COLORS[wanted] || REFERENCE_COLORS.purple;
+  return kind === 'highlight' ? sets.word.includes(normalized.toLowerCase()) : sets.fills.includes(normalized);
+}
+function referenceRunText(run) {
+  let text = '';
+  function walk(el) {
+    for (const c of el.children || []) {
+      if (c.namespaceURI === MC_NS && c.localName === 'Fallback') continue;
+      if (c.namespaceURI === W_NS && c.localName === 'p') continue;
+      if (c.namespaceURI === W_NS && c.localName === 't') text += c.textContent;
+      else if (c.namespaceURI === W_NS && (c.localName === 'tab' || c.localName === 'br' || c.localName === 'cr')) text += ' ';
+      else if (c.namespaceURI === W_NS && c.localName === 'noBreakHyphen') text += '‑';
+      else if (c.namespaceURI === W_NS && c.localName === 'softHyphen') text += '­';
+      else if (c.namespaceURI === W_NS && ['instrText', 'delText'].includes(c.localName)) continue;
+      else walk(c);
+    }
+  }
+  walk(run);
+  return text;
+}
+function referenceRuns(paragraph) {
+  const result = [];
+  // Word allows direct text highlighting, run shading and whole-paragraph or
+  // cell shading. These are recorded as external annotations, never AI proof.
+  const paraPr = childW(paragraph, 'pPr');
+  const paraShade = childW(paraPr, 'shd');
+  let cellShade = null, ancestor = paragraph.parentNode;
+  while (ancestor && ancestor.localName !== 'body') {
+    if (ancestor.namespaceURI === W_NS && ancestor.localName === 'tc') {
+      cellShade = childW(childW(ancestor, 'tcPr'), 'shd');
+      break;
+    }
+    ancestor = ancestor.parentNode;
+  }
+  const inheritedFill = wAttr(paraShade, 'fill') || wAttr(cellShade, 'fill');
+  const walk = parent => {
+    for (const ch of parent.children || []) {
+      if (ch.namespaceURI === MC_NS && ch.localName === 'Fallback') continue;
+      if (ch.namespaceURI === W_NS && ch.localName === 'p') continue;
+      if (ch.namespaceURI === W_NS && ch.localName === 'r') {
+        const t = referenceRunText(ch);
+        if (!t) continue;
+        const prop = childW(ch, 'rPr');
+        const hi = childW(prop, 'highlight');
+        const sh = childW(prop, 'shd');
+        const color = hi ? wAttr(hi, 'val') : null;
+        const fill = (sh ? wAttr(sh, 'fill') : null) || inheritedFill;
+        result.push({ text: t, highlight: color, fill });
+      } else walk(ch);
+    }
+  };
+  walk(paragraph);
+  return result;
+}
+function referenceAdvice(p, snippet, ownFlags) {
+  const sample = snippet.replace(/\s+/g, ' ').trim();
+  if (p.toc || p.heading || /^(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ|ГЛАВА|СПИСОК ЛИТЕРАТУРЫ)$/i.test(sample)) {
+    return { category: 'Служебная структура',
+      problem: 'Отмечен заголовок или элемент оглавления. Сам по себе он не содержит достаточного материала для определения происхождения текста.',
+      action: 'Проверьте разметку и границы внешнего фрагмента по оригинальному отчёту. Заголовок сохраняйте; соседний авторский текст рассматривайте отдельно.' };
+  }
+  if (p.bib) return { category: 'Библиографическая запись',
+    problem: 'Выделена стандартизированная библиографическая запись, а не самостоятельное научное рассуждение.',
+    action: 'Проверьте по первоисточнику автора, заглавие, год, страницы и DOI; не квалифицируйте запись как ИИ по единообразию оформления.' };
+  if (/10\.\d{4,9}\//i.test(sample) || /\[\s*\d+(?:,\s*\d+)*\s*\]/.test(sample))
+    return { category: 'Ссылочное утверждение',
+      problem: 'Отмеченный фрагмент содержит библиографическую отсылку, достоверность которой не устанавливается по самому тексту.',
+      action: 'Найдите первоисточник и сверьте формулировку тезиса, точную страницу и корректность ссылки. Несуществование источника нужно подтверждать отдельно.' };
+  if (p.inTable) return { category: 'Табличный текст',
+    problem: 'Отмечен текст в таблице; без заголовков граф и исходных расчётов его интерпретация ограничена.',
+    action: 'Сверьте строку с заголовками столбцов, единицами измерения, периодом и исходными таблицами расчётов; проверьте соответствие выводу в основном тексте.' };
+  if (/\d+(?:[.,]\d+)?\s*(?:%|млн|тыс|год|лет|дн|ед\.|руб)/i.test(sample))
+    return { category: 'Числовое обобщение',
+      problem: 'Отмечено количественное утверждение. Без данных нельзя проверить вычисление и переход от наблюдения к объяснению.',
+      action: 'Проверьте числитель и знаменатель, год, размер выборки, единицы и исходную таблицу; отделите корреляцию от причинного утверждения.' };
+  if (/(?:таким образом|следовательно|в целом|это свидетельствует|можно сделать вывод)/iu.test(sample))
+    return { category: 'Заключительная конструкция',
+      problem: 'Выделен переход от наблюдений к обобщению. Академическая итоговая формула неспецифична для машинного авторства.',
+      action: 'Найдите конкретные результаты предыдущих абзацев, проверьте, что заключение вытекает из них и не повторяет их без нового содержания.' };
+  if (/(?:ключев\p{L}*|комплексн\p{L}*|значим\p{L}*|эффективн\p{L}*|обеспечива\p{L}*)/iu.test(sample))
+    return { category: 'Оценочная научная формулировка',
+      problem: 'Отмечено оценочное или обобщающее выражение, возможное и в самостоятельно написанном научном тексте.',
+      action: 'Определите конкретный измеряемый показатель или проверяемое основание оценки. Укажите источник и границы интерпретации, если это требуется.' };
+  if (ownFlags.length) return { category: 'Совпадение с локальными признаками',
+    problem: 'Отмеченный внешний фрагмент находится в абзаце, где Check-AI независимо обнаружил признаки. Области могут не совпадать полностью.',
+    action: 'Сравните точное выделение с локализованными признаками Check-AI и проверьте, относятся ли они к тем же словам. Вывод о происхождении не делается автоматически.' };
+  return { category: 'Внешняя отметка без локального объяснения',
+    problem: 'Фрагмент выделен во внешнем отчёте, но Check-AI не нашёл самостоятельного локального признака в данном абзаце.',
+    action: 'Сопоставьте выделение с соседними абзацами, исследовательским вопросом, первичными материалами и научным жанром. Отсутствие локального признака фиксируйте как расхождение детекторов.' };
+}
+function collectReferenceHighlights(res, doc, mode = 'purple') {
+  const body = doc.getElementsByTagNameNS(W_NS, 'body')[0] || doc.documentElement;
+  const ps = [...body.getElementsByTagNameNS(W_NS, 'p')]
+    .filter(p => !hasAncestor(p, MC_NS, 'Fallback', body));
+  const fragments = [], colors = {}, hits = new Set();
+  let totalHighlighted = 0, totalChars = 0;
+  ps.forEach((p, i) => {
+    const info = res.paras[i];
+    if (!info) return;
+    const runs = referenceRuns(p);
+    let offset = 0, group = null;
+    function flush() {
+      if (!group || !group.text.trim()) { group = null; return; }
+      const raw = group.text;
+      const exact = raw.trim();
+      const local = (info.flags || []).filter(f => ['strong', 'medium', 'weak', 'info'].includes(f.level))
+        .map(f => ({ level: f.level, label: f.label, type: f.type }));
+      const guidance = referenceAdvice(info, exact, local);
+      fragments.push({
+        id: fragments.length + 1, para: i, paragraph: i + 1,
+        page: info.page || null, section: info.section || 'Без раздела',
+        inTable: !!info.inTable, toc: !!info.toc, heading: !!info.heading,
+        text: exact, start: group.start, end: group.end, color: group.color,
+        contextualBefore: info.text.slice(Math.max(0, group.start - 115), group.start).trim(),
+        contextualAfter: info.text.slice(group.end, group.end + 115).trim(),
+        wholeParagraphWords: info.words, flags: local.slice(0, 12),
+        category: guidance.category, problem: guidance.problem, action: guidance.action
+      });
+      hits.add(i);
+      totalHighlighted += exact.length;
+      group = null;
+    }
+    for (const run of runs) {
+      const color = run.highlight || run.fill || '';
+      if (color) colors[color] = (colors[color] || 0) + run.text.length;
+      const matched = (run.highlight && referenceColor('highlight', run.highlight, mode)) ||
+        (run.fill && referenceColor('fill', run.fill, mode));
+      if (matched) {
+        if (!group || group.end !== offset || group.color !== color) { flush(); group = { start: offset, end: offset, text: '', color }; }
+        group.text += run.text;
+        group.end += run.text.length;
+      } else flush();
+      offset += run.text.length;
+    }
+    flush();
+    totalChars += offset;
+  });
+  let blocks = 0, lastPara = -2;
+  for (const para of [...hits].sort((a,b) => a-b)) { if (para !== lastPara + 1) blocks++; lastPara = para; }
+  return {
+    enabled: true, mode, fragments,
+    markedParagraphs: hits.size, contiguousAreas: blocks,
+    selectedChars: totalHighlighted, totalTextChars: totalChars,
+    approxShare: totalChars ? +(100 * totalHighlighted / totalChars).toFixed(2) : 0,
+    availableColors: Object.entries(colors).sort((a,b) => b[1] - a[1])
+      .map(([color, chars]) => ({ color, chars })),
+    notice: 'Это предварительная разметка стороннего детектора. Доля символов рассчитана по Word и не соответствует проценту «ИИ» во внешнем отчёте. Она не является доказанным авторством.'
+  };
+}
+
 /* ===================================================================
    Формирование экспертного заключения в формате DOCX (OOXML вручную)
    =================================================================== */
@@ -2826,6 +3014,34 @@ async function buildReportDocx(res) {
     out.push(P(`Абзацев с признаками: ${fN(zone.length)}. Приведены первые ${Math.min(zone.length, 200)} в порядке следования.`));
     out.push(table([['Абз.', 'Стр.', 'Место', 'Признаки', 'Начало абзаца'], ...zone.slice(0, 200).map(p => [String(p.i + 1), p.page ? String(p.page) : '', p.table != null ? tableLabel(res, p.table) : p.section.slice(0, 40), [...new Set(p.flags.filter(f => f.level !== 'info').map(f => f.label))].slice(0, 3).join('; '), snippet(p.text, null, 90)])], [650, 650, 1700, 3100, 3255], { header: true }));
   } else out.push(P('Абзацев с признаками нет.'));
+  if (res.reference) {
+    const rr = res.reference;
+    out.push(H1('Приложение В. Ручные выделения из внешней проверки'));
+    out.push(P('Режим сопоставления с разметкой стороннего детектора. Цвет: ' + rr.mode +
+      '. Фрагментов: ' + fN(rr.fragments.length) +
+      '; затронутых абзацев: ' + fN(rr.markedParagraphs) +
+      '; последовательных зон: ' + fN(rr.contiguousAreas) + '.'));
+    out.push(P(rr.notice));
+    if (!rr.fragments.length) out.push(P('Отметок выбранного цвета не найдено. Проверьте реальный цвет выделения в документе Word.'));
+    for (const fragment of rr.fragments.slice(0, 2000)) {
+      out.push(H2('Выделение №' + fragment.id + ' — абзац ' + fragment.paragraph +
+        (fragment.page ? ', с. ' + fragment.page : '') + ' — ' + fragment.category));
+      out.push(P('Раздел: ' + fragment.section + (fragment.inTable ? ' (таблица)' : '')));
+      out.push(P('Точно выделенный текст: ' + fragment.text.slice(0, 3500) +
+        (fragment.text.length > 3500 ? ' [длинный фрагмент сокращён; оригинал остаётся в DOCX]' : '')));
+      if (fragment.contextualBefore || fragment.contextualAfter)
+        out.push(P('Ближайший контекст: ' + fragment.contextualBefore.slice(-150) +
+          ' [ВЫДЕЛЕНИЕ] ' + fragment.contextualAfter.slice(0, 150)));
+      out.push(P('Проблема: ' + fragment.problem));
+      out.push(P('Действие по проверке: ' + fragment.action));
+      const local = fragment.flags.filter(x => ['strong','medium','weak'].includes(x.level));
+      out.push(P('Независимые признаки Check-AI в пределах абзаца: ' +
+        (local.length ? local.map(x => '[' + x.level + '] ' + x.label).join('; ') : 'не установлены. Это расхождение с внешней разметкой, а не доказательство её ошибки.')));
+    }
+    if (rr.fragments.length > 2000)
+      out.push(P('Из-за объёма отчёта выведены первые 2000 фрагментов; исходные выделения сохранены в DOCX.'));
+  }
+
   out.push(para(`Заключение сформировано автоматически программой «Проверка DOCX на признаки ИИ» v${APP_VERSION} ${res.date.toLocaleString('ru-RU')}. Результаты носят вероятностный характер и подлежат оценке специалистом.`, { style: 'Small' }));
 
   const body = out.join('');
@@ -2928,13 +3144,28 @@ async function buildAnnotatedDocx(res) {
     'Это копия для анализа; исходный файл не изменён.',
   ]);
 
+  const manualByPara = new Map();
+  if (res.reference) for (const fragment of res.reference.fragments) {
+    if (!manualByPara.has(fragment.para)) manualByPara.set(fragment.para, []);
+    manualByPara.get(fragment.para).push(fragment);
+  }
   res.paras.forEach((para, i) => {
     const flags = para.flags.filter(f => f.level !== 'info' || f.type === 'short');
-    if (!flags.length || !all[i]) return;
+    const reference = manualByPara.get(i) || [];
+    if ((!flags.length && !reference.length) || !all[i]) return;
     const top = flags.reduce((m, f) => LVL_ORDER[f.level] > LVL_ORDER[m] ? f.level : m, 'info');
     const runs = ownRuns(all[i]);
     if (!runs.length) return;
-    runs.forEach(r => shadeRun(doc, r, FILL[top]));
+    if (flags.length) {
+      runs.forEach(r => {
+        // Do not erase colors copied from the source/vendor report.
+        if (res.reference) {
+          const p = childW(r, 'rPr');
+          if (childW(p, 'highlight') || childW(p, 'shd')) return;
+        }
+        shadeRun(doc, r, FILL[top]);
+      });
+    }
     marked++;
     if (!para.inBox) {
       const uniq = [...new Map(flags.map(f => [f.label, f])).values()].sort((a, b) => LVL_ORDER[b.level] - LVL_ORDER[a.level]);
@@ -2950,7 +3181,15 @@ async function buildAnnotatedDocx(res) {
         'Абзац №' + (i + 1) + ': научная редакторская проверка',
         'Начало: «' + para.text.trim().slice(0, 125) + '»',
         ...tasks,
-        'Ограничение: замечание не устанавливает авторство и не гарантирует изменение оценки внешнего детектора.'
+        ...reference.slice(0, 10).flatMap((f, k) => [
+          'Внешнее выделение №' + f.id + ' (' + f.category + '): «' + f.text.slice(0, 380) + '»',
+          'Проблема внешнего выделения ' + (k + 1) + ': ' + f.problem,
+          'Действие по проверке внешнего выделения ' + (k + 1) + ': ' + f.action,
+          'Собственные признаки в этом абзаце: ' +
+            (f.flags.filter(z => ['strong','medium','weak'].includes(z.level)).map(z => z.label).join('; ') || 'не найдены')
+        ]),
+        ...(reference.length > 10 ? ['Остальные внешние выделения в этом абзаце см. в приложении к заключению.'] : []),
+        'Ограничение: внешняя подсветка — не подтверждённое авторство; исправления не гарантируют изменение оценки другого детектора.'
       ]);
     }
   });
@@ -3026,7 +3265,12 @@ async function handleFile(file) {
   $('#results').hidden = true; $('#error').hidden = true;
   $('#progress').hidden = false; setStatus('Чтение файла…');
   try {
-    RES = await analyzeFile(file, setStatus);
+    const marked = $('#reference-enabled').checked;
+    if (marked && !/\.docx$/i.test(file.name)) throw new Error('Ручная цветная разметка поддерживается только в .docx. Для TXT/MD/PDF используйте обычную проверку.');
+    RES = await analyzeFile(file, setStatus, {
+      referenceHighlights: marked,
+      referenceColor: $('#reference-color').value
+    });
     render(RES);
     window.dispatchEvent(new CustomEvent('check-ai:analysis-ready', { detail: { result: RES } }));
   } catch (e) {
@@ -3139,9 +3383,60 @@ function render(r) {
   $('#pfilter').innerHTML = '<option value="">Все абзацы с признаками</option>' + [...types.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => `<option value="${esc(k)}">${esc(k)} (${n})</option>`).join('');
   renderParas();
 
+  renderReferenceReview(r);
   $('#annot').hidden = r.kind !== 'docx';
   $('#results').hidden = false;
   $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderReferenceReview(r) {
+  const ref = r.reference;
+  $('#reference-tab').hidden = !ref;
+  if (!ref && document.querySelector('.tab.active')?.dataset.tab === 'reference') showTab('findings');
+  if (!ref) { $('#reference-summary').textContent = ''; $('#reference-items').textContent = ''; return; }
+  const flagsCount = ref.fragments.filter(f => f.flags.some(flag => ['strong','medium','weak'].includes(flag.level))).length;
+  $('#reference-summary').innerHTML =
+    '<h3>Экспертиза заранее выделенных фрагментов</h3>' +
+    '<p class="muted small">' + esc(ref.notice) + '</p>' +
+    '<div class="kpis">' + [
+      ['Отмеченных фрагментов', ref.fragments.length, 'точные части DOCX'],
+      ['Абзацев с выделением', ref.markedParagraphs, 'в том числе в таблицах'],
+      ['Зон подряд', ref.contiguousAreas, 'не независимые решения детектора'],
+      ['Совпадений с признаками Check-AI', flagsCount, 'на уровне абзаца, не слова']
+    ].map(([title,num,detail]) => '<div class="kpi"><div class="kpi-t">' + esc(title) +
+      '</div><div class="kpi-n">' + num + '</div><div class="kpi-d">' + esc(detail) + '</div></div>').join('') + '</div>' +
+    '<p class="muted small">Выбрано символов: ' + ref.selectedChars +
+      ' (' + ref.approxShare.toFixed(2).replace('.',',') +
+      '% символов в XML-разметке Word). Это не показатель «ИИ-контента» из «Антиплагиата».</p>';
+  if (!ref.fragments.length) {
+    $('#reference-items').innerHTML =
+      '<p>Для выбранного цвета выделение не найдено. В DOCX проверьте Word-маркер или заливку текста; при необходимости установите «Любой цвет подсветки» и загрузите документ заново.</p>' +
+      '<p class="muted small">Встреченные цвета: ' +
+      esc(ref.availableColors.map(x => x.color + ' (' + x.chars + ' симв.)').join(', ') || 'нет цветной разметки') + '</p>';
+    return;
+  }
+  const max = 500;
+  $('#reference-items').innerHTML = ref.fragments.slice(0, max).map(f => {
+    const found = f.flags.filter(flag => ['strong','medium','weak'].includes(flag.level));
+    const labels = found.map(flag => '<span class="chip c-' + flag.level + '">' + esc(flag.label) + '</span>').join('');
+    return '<article class="para" id="reference-' + f.id + '">' +
+      '<div class="p-head"><b>Выделение №' + f.id + '</b>' +
+      '<a class="goto" href="#" data-i="' + f.para + '">абзац №' + f.paragraph + '</a> ' +
+      (f.page ? '<span>с. ' + f.page + '</span>' : '') +
+      '<span class="muted">' + esc(f.section.slice(0,85)) +
+      (f.inTable ? ' · внутри таблицы' : '') + '</span></div>' +
+      '<p class="small"><b>Точно выделено:</b> <mark>' + esc(f.text.slice(0,2200)) +
+      (f.text.length > 2200 ? '…' : '') + '</mark></p>' +
+      (f.contextualBefore || f.contextualAfter
+        ? '<p class="muted small">Контекст: ' + esc(f.contextualBefore.slice(-105)) +
+          ' ⟦выделение⟧ ' + esc(f.contextualAfter.slice(0,105)) + '</p>' : '') +
+      '<p><b>Проблема (' + esc(f.category) + '):</b> ' + esc(f.problem) + '</p>' +
+      '<p><b>Действие по проверке:</b> ' + esc(f.action) + '</p>' +
+      '<p class="muted small">Собственные признаки Check-AI в абзаце: ' +
+       (found.length ? labels : 'не выявлены. Это расхождение с внешней разметкой, а не её опровержение.') + '</p></article>';
+  }).join('') +
+  (ref.fragments.length > max ? '<p class="muted">В интерфейсе отображены первые ' + max +
+    ' фрагментов. Все фрагменты включены в Word-заключение.</p>' : '');
 }
 
 function renderParas(focus) {

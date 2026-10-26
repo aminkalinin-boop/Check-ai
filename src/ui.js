@@ -17,7 +17,12 @@ async function handleFile(file) {
   $('#results').hidden = true; $('#error').hidden = true;
   $('#progress').hidden = false; setStatus('Чтение файла…');
   try {
-    RES = await analyzeFile(file, setStatus);
+    const marked = $('#reference-enabled').checked;
+    if (marked && !/\.docx$/i.test(file.name)) throw new Error('Ручная цветная разметка поддерживается только в .docx. Для TXT/MD/PDF используйте обычную проверку.');
+    RES = await analyzeFile(file, setStatus, {
+      referenceHighlights: marked,
+      referenceColor: $('#reference-color').value
+    });
     render(RES);
     window.dispatchEvent(new CustomEvent('check-ai:analysis-ready', { detail: { result: RES } }));
   } catch (e) {
@@ -130,9 +135,60 @@ function render(r) {
   $('#pfilter').innerHTML = '<option value="">Все абзацы с признаками</option>' + [...types.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => `<option value="${esc(k)}">${esc(k)} (${n})</option>`).join('');
   renderParas();
 
+  renderReferenceReview(r);
   $('#annot').hidden = r.kind !== 'docx';
   $('#results').hidden = false;
   $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderReferenceReview(r) {
+  const ref = r.reference;
+  $('#reference-tab').hidden = !ref;
+  if (!ref && document.querySelector('.tab.active')?.dataset.tab === 'reference') showTab('findings');
+  if (!ref) { $('#reference-summary').textContent = ''; $('#reference-items').textContent = ''; return; }
+  const flagsCount = ref.fragments.filter(f => f.flags.some(flag => ['strong','medium','weak'].includes(flag.level))).length;
+  $('#reference-summary').innerHTML =
+    '<h3>Экспертиза заранее выделенных фрагментов</h3>' +
+    '<p class="muted small">' + esc(ref.notice) + '</p>' +
+    '<div class="kpis">' + [
+      ['Отмеченных фрагментов', ref.fragments.length, 'точные части DOCX'],
+      ['Абзацев с выделением', ref.markedParagraphs, 'в том числе в таблицах'],
+      ['Зон подряд', ref.contiguousAreas, 'не независимые решения детектора'],
+      ['Совпадений с признаками Check-AI', flagsCount, 'на уровне абзаца, не слова']
+    ].map(([title,num,detail]) => '<div class="kpi"><div class="kpi-t">' + esc(title) +
+      '</div><div class="kpi-n">' + num + '</div><div class="kpi-d">' + esc(detail) + '</div></div>').join('') + '</div>' +
+    '<p class="muted small">Выбрано символов: ' + ref.selectedChars +
+      ' (' + ref.approxShare.toFixed(2).replace('.',',') +
+      '% символов в XML-разметке Word). Это не показатель «ИИ-контента» из «Антиплагиата».</p>';
+  if (!ref.fragments.length) {
+    $('#reference-items').innerHTML =
+      '<p>Для выбранного цвета выделение не найдено. В DOCX проверьте Word-маркер или заливку текста; при необходимости установите «Любой цвет подсветки» и загрузите документ заново.</p>' +
+      '<p class="muted small">Встреченные цвета: ' +
+      esc(ref.availableColors.map(x => x.color + ' (' + x.chars + ' симв.)').join(', ') || 'нет цветной разметки') + '</p>';
+    return;
+  }
+  const max = 500;
+  $('#reference-items').innerHTML = ref.fragments.slice(0, max).map(f => {
+    const found = f.flags.filter(flag => ['strong','medium','weak'].includes(flag.level));
+    const labels = found.map(flag => '<span class="chip c-' + flag.level + '">' + esc(flag.label) + '</span>').join('');
+    return '<article class="para" id="reference-' + f.id + '">' +
+      '<div class="p-head"><b>Выделение №' + f.id + '</b>' +
+      '<a class="goto" href="#" data-i="' + f.para + '">абзац №' + f.paragraph + '</a> ' +
+      (f.page ? '<span>с. ' + f.page + '</span>' : '') +
+      '<span class="muted">' + esc(f.section.slice(0,85)) +
+      (f.inTable ? ' · внутри таблицы' : '') + '</span></div>' +
+      '<p class="small"><b>Точно выделено:</b> <mark>' + esc(f.text.slice(0,2200)) +
+      (f.text.length > 2200 ? '…' : '') + '</mark></p>' +
+      (f.contextualBefore || f.contextualAfter
+        ? '<p class="muted small">Контекст: ' + esc(f.contextualBefore.slice(-105)) +
+          ' ⟦выделение⟧ ' + esc(f.contextualAfter.slice(0,105)) + '</p>' : '') +
+      '<p><b>Проблема (' + esc(f.category) + '):</b> ' + esc(f.problem) + '</p>' +
+      '<p><b>Действие по проверке:</b> ' + esc(f.action) + '</p>' +
+      '<p class="muted small">Собственные признаки Check-AI в абзаце: ' +
+       (found.length ? labels : 'не выявлены. Это расхождение с внешней разметкой, а не её опровержение.') + '</p></article>';
+  }).join('') +
+  (ref.fragments.length > max ? '<p class="muted">В интерфейсе отображены первые ' + max +
+    ' фрагментов. Все фрагменты включены в Word-заключение.</p>' : '');
 }
 
 function renderParas(focus) {
