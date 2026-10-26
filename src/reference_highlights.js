@@ -71,6 +71,10 @@ function referenceRuns(paragraph) {
 function referenceAdvice(p, snippet, ownFlags) {
   // Analyze exactly the marked phrase for explicit constructions and its
   // containing paragraph for rhythm; report their scopes separately.
+  // Exact selected words take precedence over adjacent context. The supplied
+  // writing standard is editorial evidence, NOT a signal of AI authorship.
+  const author=authorMarkedGuidance(p,snippet);
+  const exactAuthor=author.primary;
   const d=scientificParagraphDiagnosis(p.text,snippet,p);
   const primary=bestScientificSignal(d);
   const kb=primary?knowledgeSourceEntry(primary.id):null;
@@ -82,11 +86,20 @@ function referenceAdvice(p, snippet, ownFlags) {
     (primary?.title||'Маркер не установлен');
   const hasBodyEvidence=usable.some(x=>!['quantitative','table-context','structural','bibliography'].includes(x.id));
   return {
-    category,
-    problem:primary?.evidence||'Нет измеримого локального маркера.',
-    reason:(primary?.interpretation||'Внутренние признаки независимы от внешней подсветки.') + (kb ? ' База знаний: ' + kb.title + '; статус ' + kb.evidence_status + '; проверяемые источники ' + kb.source_ids.join(', ') + '. ' + kb.interpretation : ''),
-    action:primary?.action||'Сверьте научные утверждения с источниками и контекстом.',
+    category: exactAuthor?'Авторский стандарт: '+exactAuthor.title:category,
+    problem:exactAuthor?
+      'В выделении обнаружено «'+exactAuthor.quote+'» (правило '+exactAuthor.section+').':
+      (primary?.evidence||'Нет измеримого локального маркера.'),
+    reason:exactAuthor?
+      (exactAuthor.why+' Это проверка авторского научного стиля, а не объяснение внутреннего решения Антиплагиата.'):
+      (primary?.interpretation||'Внутренние признаки независимы от внешней подсветки.') + (kb ? ' База знаний: ' + kb.title + '; статус ' + kb.evidence_status + '; проверяемые источники ' + kb.source_ids.join(', ') + '. ' + kb.interpretation : ''),
+    action:exactAuthor?.action||primary?.action||'Сверьте научные утверждения с источниками и контекстом.',
     diagnostic: { signals:detail,metrics:d.metric,hasLocalLinguisticEvidence:hasBodyEvidence,
+      authorGuideline: {
+        exact:author.selected.map(x=>({title:x.title,quote:x.quote,why:x.why,action:x.action,section:x.section})),
+        outsideSelection:author.paragraphOnly.map(x=>({title:x.title,quote:x.quote,section:x.section})),
+        notice:author.notice,origin:CHECK_AI_AUTHOR_STANDARD.source
+      },
       specificity: 'Описание измеряемых языковых особенностей, не реконструкция закрытого алгоритма Антиплагиата' }
   };
 }
