@@ -5,7 +5,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const root = path.join(__dirname, '..');
-const helper = fs.readFileSync(path.join(root, 'src', 'annotation_guidance.js'), 'utf8');
+const helper = fs.readFileSync(path.join(root, 'src', 'linguistic_diagnostics.js'), 'utf8') +
+  '\n' + fs.readFileSync(path.join(root, 'src', 'annotation_guidance.js'), 'utf8');
 const mark = fs.readFileSync(path.join(root, 'src', 'annotate.js'), 'utf8');
 const ui = fs.readFileSync(path.join(root, 'src', 'ui.js'), 'utf8');
 const box = {};
@@ -28,8 +29,8 @@ test('Every visible flag is explained with a concrete action', () => {
   assert.match(box.advice(inputs[4], {}).action, /вычислением/);
 });
 test('Annotated DOCX comments say Problem and Action and distinguish informational highlights', () => {
-  assert.match(mark, /Проблема /);
-  assert.match(mark, /Действие по исправлению /);
+  assert.match(mark, /Измеримый признак/);
+  assert.match(mark, /Точное действие/);
   assert.match(mark, /annotationAdvice\(f, para\)/);
   assert.match(mark, /f\.type === 'short'/);
   assert.match(mark, /info: 'E8EDF4'/);
