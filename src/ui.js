@@ -42,6 +42,20 @@ function render(r) {
     ['Слабые признаки', s.counts.weak, 'статистические, неспецифичные'],
   ].map(([t, n, d]) => `<div class="kpi"><div class="kpi-t">${t}</div><div class="kpi-n">${n}</div><div class="kpi-d">${esc(d)}</div></div>`).join('');
 
+
+  // Четыре типа наблюдений. Отсутствие доступа к ключам — НЕ отрицательная проверка.
+  const E = s.provenance;
+  if (E && document.getElementById('provenance-summary')) {
+    $('#provenance-summary').innerHTML = '<h3>Классы наблюдений и границы проверки</h3>' +
+      '<p class="muted small">Это независимые источники сведений, не проценты авторства. Уровни признаков в исходном заключении не изменены.</p>' +
+      '<div class="kpis">' + E.classes.map(x =>
+        '<div class="kpi"><div class="kpi-t">' + esc(x.title) + '</div>' +
+        '<div class="kpi-n" style="font-size:17px">' + (x.count == null ? '—' : x.count) + '</div>' +
+        '<div class="kpi-d">' + esc(x.status) + '</div></div>').join('') + '</div>' +
+      '<p class="muted small">' + esc(E.classes[3].detail) + ' Для проверки по ключу нужны официальные инструменты поставщика модели; Check-AI их не вызывает.</p>' +
+      (E.predominantlyEnglish ? '<p class="muted small">Осторожность для академического английского: простота формулировок и низкое лексическое разнообразие могут приводить к ложным срабатываниям, особенно у пишущих не на родном языке.</p>' : '');
+  }
+
   // карта документа
   const cells = r.paras.filter(p => p.words > 0 && !p.toc);
   const lvlOf = p => { const o = { strong: 3, medium: 2, weak: 1, info: 0 }; let m = -1; for (const f of p.flags) m = Math.max(m, o[f.level] ?? -1); return m; };
