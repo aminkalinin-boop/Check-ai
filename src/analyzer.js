@@ -227,6 +227,7 @@ async function analyzeFile(file, onProgress = () => {}, options = {}) {
     provenanceFairnessChecks(res);
     finalize(res);
     recordOfflineAudit(res);
+    knowledgeAudit(res);
     return res;
   }
   onProgress('Распаковка DOCX…');
@@ -298,6 +299,7 @@ async function analyzeFile(file, onProgress = () => {}, options = {}) {
     onProgress('Анализ ручной разметки…');
     res.reference = collectReferenceHighlights(res, doc, options.referenceColor || 'purple');
   }
+  knowledgeAudit(res);
   return res;
 }
 
