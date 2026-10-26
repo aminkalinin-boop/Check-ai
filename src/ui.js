@@ -13,11 +13,13 @@ function setStatus(t) { $('#status').textContent = t; }
 async function handleFile(file) {
   if (!file) return;
   LAST_FILE = file; const sm = document.getElementById('saveMsg'); if (sm) sm.textContent = '';
+  window.dispatchEvent(new Event('check-ai:analysis-started'));
   $('#results').hidden = true; $('#error').hidden = true;
   $('#progress').hidden = false; setStatus('Чтение файла…');
   try {
     RES = await analyzeFile(file, setStatus);
     render(RES);
+    window.dispatchEvent(new CustomEvent('check-ai:analysis-ready', { detail: { result: RES } }));
   } catch (e) {
     console.error(e);
     $('#error').hidden = false; $('#error').textContent = 'Ошибка: ' + e.message;
@@ -95,6 +97,24 @@ function render(r) {
   const m = r.meta;
   const rows = [['Автор', m.creator], ['Последний редактор', m.lastModifiedBy], ['Создан', m.created], ['Изменён', m.modified], ['Ревизия', m.revision], ['Время правки, мин', m.totalTime], ['Приложение', [m.application, m.appVersion].filter(Boolean).join(' ')], ['Страниц / слов (метаданные)', [m.pages, m.metaWords].filter(Boolean).join(' / ')], ['Сеансов правки (rsid)', m.rsids], ['Название', m.title], ['Тема', m.subject], ['Ключевые слова', m.keywords], ['Описание', m.description], ['Таблиц / диаграмм / изображений', r.kind === 'docx' ? `${m.tables} / ${m.charts} / ${r.media.length}` : null], ['Сносок', r.footnotes.length], ['Комментарии / исправления', r.kind === 'docx' ? `${m.comments} / ${m.insertions + m.deletions}` : null], ['Таблиц (верхнего уровня / всего)', r.kind === 'docx' ? `${m.topTables} / ${m.tables}` : null], ['Секций / DrawingML / VML', r.kind === 'docx' ? `${m.sections} / ${m.drawingML} / ${m.vml}` : null], ['Формул / подписей таблиц / рисунков / приложений', r.kind === 'docx' ? `${m.formulas} / ${m.captionsTab} / ${m.captionsFig} / ${m.appendices}` : null], ['Уникальных rsid в тексте', m.distinctRsids], ['Менеджеры библиографии', (m.addins || []).join(', ')], ['Внешние связи объектов', m.externalLinks ? `${m.externalLinks.length}${m.cloud && m.cloud.length ? ' (' + m.cloud.join(', ') + ')' : ''}` : null], ['Гиперссылок / через Google', r.stats.links ? `${r.stats.links.total} / ${r.stats.links.redirect}` : null], ['Домены ссылок', r.stats.links ? r.stats.links.domains.slice(0, 10).map(([d, n]) => `${d} (${n})`).join(', ') : null], ['Ссылок на источники в тексте', r.stats.citations ? `${r.stats.citations.total} (на ${r.stats.citations.unique} источников из ${r.stats.citations.bib})` : null], ['Страницы определены', m.pageSource === 'rendered' ? 'по последней разметке Word' : m.pageSource ? 'по явным разрывам (приблизительно)' : null], ['Шрифты', (m.fonts || []).join(', ')], ['MD5', r.file.md5], ['SHA-256', r.file.sha256]];
   $('#meta').innerHTML = `<table><tbody>${rows.filter(x => x[1] != null && x[1] !== '').map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join('')}</tbody></table>`;
+
+  // Единый автономный каталог этапов и сценариев. Никаких запросов в сеть.
+  if (s.offlineEngine) {
+    const led = s.offlineEngine;
+    $('#meta').insertAdjacentHTML('beforeend',
+      '<h3>Автономное ядро: протокол этапов</h3>' +
+      '<p class="muted small">Проверки и справочники встроены в HTML. Эта таблица описывает выполненные стадии и ограничения, а не вероятность авторства.</p>' +
+      '<table><thead><tr><th>Этап</th><th>Статус</th><th>Назначение</th></tr></thead><tbody>' +
+      led.stages.map(st => '<tr><td>' + esc(st.title) + '</td><td>' + esc(st.status) +
+        '</td><td>' + esc(st.purpose) + '</td></tr>').join('') + '</tbody></table>' +
+      '<p class="muted small">Встроено: CSS-шаблонов ' + led.locallyBundled.webStylePatterns +
+      ', шаблонов реплик чат-ботов ' + led.locallyBundled.chatResponsePatterns +
+      ', языковых клише ' + led.locallyBundled.academicClichePatterns +
+      ', экономических терминов ' + led.locallyBundled.economyGlossary +
+      ', групп проверки ' + led.locallyBundled.detectorGroups +
+      ', сценариев ' + led.locallyBundled.scenarios + '.</p>' +
+      '<p class="muted small">' + esc(led.limitations) + '</p>');
+  }
 
   // фильтр абзацев
   const types = new Map();
