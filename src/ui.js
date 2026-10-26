@@ -177,13 +177,18 @@ function renderReferenceReview(r) {
       (f.page ? '<span>с. ' + f.page + '</span>' : '') +
       '<span class="muted">' + esc(f.section.slice(0,85)) +
       (f.inTable ? ' · внутри таблицы' : '') + '</span></div>' +
-      '<p class="small"><b>Точно выделено:</b> <mark>' + esc(f.text.slice(0,2200)) +
-      (f.text.length > 2200 ? '…' : '') + '</mark></p>' +
-      (f.contextualBefore || f.contextualAfter
-        ? '<p class="muted small">Контекст: ' + esc(f.contextualBefore.slice(-105)) +
-          ' ⟦выделение⟧ ' + esc(f.contextualAfter.slice(0,105)) + '</p>' : '') +
-      '<p><b>Проблема (' + esc(f.category) + '):</b> ' + esc(f.problem) + '</p>' +
-      '<p><b>Действие по проверке:</b> ' + esc(f.action) + '</p>' +
+      '<p class="muted small">Исходный текст не дублируется: перейдите к абзацу по ссылке выше или откройте документ с цветной разметкой.</p>' +
+      '<p><b>Измеренный признак (' + esc(f.category) + '):</b> ' + esc(f.problem) + '</p>' +
+      '<p><b>Почему требует проверки:</b> ' + esc(f.reason) + '</p>' +
+      '<p><b>Точное действие:</b> ' + esc(f.action) + '</p>' +
+      (f.diagnostic?.signals?.length > 1 ? '<details class="finding"><summary>Дополнительные наблюдения (' +
+        (f.diagnostic.signals.length-1) + ')</summary><div class="f-body">' +
+        f.diagnostic.signals.slice(1).map(sig =>
+          '<p><b>' + esc(sig.marker) + ':</b> ' + esc(sig.evidence) +
+          '<br>Проверить: ' + esc(sig.action) + '</p>').join('') + '</div></details>' : '') +
+      (f.diagnostic?.metrics ? '<p class="muted small">Объём: ' + f.diagnostic.metrics.words +
+         ' слов, ' + f.diagnostic.metrics.sentenceCount + ' предложений; средняя длина ' +
+         f.diagnostic.metrics.meanSentenceWords + ' слова. Это описательные величины, не оценка ИИ-авторства.</p>' : '') +
       '<p class="muted small">Собственные признаки Check-AI в абзаце: ' +
        (found.length ? labels : 'не выявлены. Это расхождение с внешней разметкой, а не её опровержение.') + '</p></article>';
   }).join('') +
