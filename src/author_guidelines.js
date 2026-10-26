@@ -8,6 +8,20 @@ const CHECK_AI_AUTHOR_STANDARD = Object.freeze({
   version:'5.2.3-2026-10-18',
   source:'Авторские правила научной статьи по специальности 5.2.3, редакция 18.10.2026',
   limits:'Индивидуальный стандарт конкретной научной редакции. Нарушение правила не доказывает ИИ-генерацию; корректность термина зависит от контекста.',
+  promptConditioning:[
+    {id:'cliche-avoidance',instruction:'Запрет шаблонных вводных и итоговых конструкций',
+      observation:'Частота устойчивых клише может снизиться',
+      caveat:'Низкая частота клише не подтверждает человеческое происхождение текста.'},
+    {id:'terminology-constraint',instruction:'Предписанный словарь экономической терминологии',
+      observation:'Терминология становится последовательнее и ближе к заданному стилю',
+      caveat:'Корректное употребление терминов не показывает, человеком или моделью написан текст.'},
+    {id:'author-voice',instruction:'Изложение через действие исследователя, первоисточники и расчёты',
+      observation:'Вместо обобщённых формул появляются предметные указания на метод и данные',
+      caveat:'Истинность источников, вычислений и авторства по форме фразы не устанавливается.'},
+    {id:'structural-novelty',instruction:'Разнообразие начал абзацев и композиционных моделей',
+      observation:'Могут сократиться повторы и композиционные шаблоны',
+      caveat:'Снижение повторов может быть редакторским эффектом; конкретный промпт по рукописи не восстанавливается.'}
+  ],
   classes:{
     formula:'Риторическая/шаблонная формула',
     language:'Авторская стилистическая норма',
@@ -142,7 +156,8 @@ function authorGuidelineAudit(res) {
     }
   }
   const result={version:CHECK_AI_AUTHOR_STANDARD.version,source:CHECK_AI_AUTHOR_STANDARD.source,
-    limits:CHECK_AI_AUTHOR_STANDARD.limits,ruleCount:CHECK_AI_AUTHOR_RULES.length,
+    limits:CHECK_AI_AUTHOR_STANDARD.limits,promptConditioning:CHECK_AI_AUTHOR_STANDARD.promptConditioning,
+    ruleCount:CHECK_AI_AUTHOR_RULES.length,
     paragraphsReviewed:paras.length,paragraphsWithNotes:marked,matches,byKind:groups,examples,
     verdictImpact:'none',scope:'Стилистическая и предметная редактура; не вероятность авторства.'};
   if(!res.stats)res.stats={};
