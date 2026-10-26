@@ -7,19 +7,24 @@ The canonical index.html is not written or modified.
 """
 from pathlib import Path
 import re
+import json
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src"
 ORDER = [
     "analyzer.js", "content.js", "stylometry.js", "extra.js",
-    "robustness.js", "academic_audit.js", "discourse_audit.js", "provenance_fairness.js", "offline_engine.js", "short_text_audit.js", "annotation_guidance.js", "reference_highlights.js", "linguistic_diagnostics.js", "report_docx.js", "report2.js", "annotate.js", "platform.js", "ui.js"
+    "robustness.js", "academic_audit.js", "discourse_audit.js", "provenance_fairness.js", "offline_engine.js", "short_text_audit.js", "annotation_guidance.js", "reference_highlights.js", "linguistic_diagnostics.js", "knowledge_integration.js", "report_docx.js", "report2.js", "annotate.js", "platform.js", "ui.js"
 ]
 
+
+def knowledge_js():
+    source = json.loads((ROOT / 'data' / 'marker_evidence.json').read_text(encoding='utf-8'))
+    return 'const CHECK_AI_MARKER_KB = Object.freeze(' + json.dumps(source, ensure_ascii=False, separators=(',', ':')) + ');\n'
 
 def build_core():
     template = (SOURCE / "template.html").read_text(encoding="utf-8")
     jszip = (ROOT / "vendor" / "jszip.min.js").read_text(encoding="utf-8")
-    js = "\n".join((SOURCE / name).read_text(encoding="utf-8") for name in ORDER)
+    js = knowledge_js() + "\n".join((SOURCE / name).read_text(encoding="utf-8") for name in ORDER)
     if "</script" in jszip.lower() or "</script" in js.lower():
         raise ValueError("Unsafe closing script tag in source")
     if template.count("/*JSZIP*/") != 1 or template.count("/*APP*/") != 1:
@@ -50,7 +55,7 @@ def main():
     # The public index.html is the same online-capable interface.
     template = (SOURCE / "template.html").read_text(encoding="utf-8")
     jszip = (ROOT / "vendor" / "jszip.min.js").read_text(encoding="utf-8")
-    js = "\n".join((SOURCE / name).read_text(encoding="utf-8") for name in ORDER) + "\n" + config + "\n" + addon
+    js = knowledge_js() + "\n".join((SOURCE / name).read_text(encoding="utf-8") for name in ORDER) + "\n" + config + "\n" + addon
     online = template.replace("/*JSZIP*/", jszip).replace("/*APP*/", js)
 
     (out_offline / "index.html").write_text(offline, encoding="utf-8")
