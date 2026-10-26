@@ -109,7 +109,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
 <div class="wrap">
   <header>
     <h1>Проверка документа на признаки применения ИИ</h1>
-    <p>Анализ DOCX: разметка веб-интерфейсов нейросетей, скрытые символы, метаданные, остатки ответов чат-ботов, повторы, сноски и ссылки.</p>
+    <p>Предварительный аудит DOCX: технические следы переноса, особенности текста, метаданные, сноски и ссылки. Не устанавливает автора или факт генерации.</p>
   </header>
 
   <div id="drop" class="drop" tabindex="0" role="button" aria-label="Выбрать файл">
@@ -160,7 +160,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
     <div class="pane" id="pane-meta" hidden><div id="meta"></div></div>
   </div>
 
-  <footer>Результаты носят вероятностный характер: признак показывает, что текст проходил через соответствующий сервис или веб-страницу, но не устанавливает авторство и долю машинного текста.</footer>
+  <footer>Результаты — диагностические ориентиры, а не доказательство использования ИИ. Сигнатуры могут показывать путь переноса фрагментов через веб-интерфейс, но не устанавливают автора, факт генерации и долю машинного текста.</footer>
 </div>
 <script>/*!
 
@@ -1085,35 +1085,39 @@ function finalize(res) {
   res.stats.sources = Object.entries(sources).sort((a, b) => b[1] - a[1]);
   const mainSrc = F.some(f => f.id === 'combo:gemini') ? 'Google Gemini / Google AI Studio' : (res.stats.sources[0] ? res.stats.sources[0][0] : null);
 
-  let verdict, conf, scale;
-  if (strong.length) {
-    verdict = 'Выявлены прямые признаки применения генеративного ИИ';
-    conf = (strong.length >= 2 || share >= 20) ? 'высокая' : 'средняя';
-  } else if (medium.filter(f => ['tech', 'meta', 'chars', 'text'].includes(f.group)).length >= 2) {
-    verdict = 'Выявлены косвенные технические признаки использования нейросетевых сервисов';
-    conf = 'средняя';
-  } else if (!F.some(f => ['tech', 'meta', 'chars', 'text'].includes(f.group) && ['medium', 'weak'].includes(f.level)) && F.some(f => ['comp', 'src'].includes(f.group) && f.level !== 'info')) {
-    verdict = 'Технических следов нейросетевых сервисов не выявлено; есть недоработки ссылочного аппарата и следы черновой компиляции';
-    conf = 'низкая';
+  // Классификация относится к обнаруженным маркерам, но НЕ к вероятности авторства.
+  // Даже специфическая разметка устанавливает путь переноса контента, а не способ его создания.
+  const technical = F.filter(f => ['tech', 'meta', 'chars', 'text'].includes(f.group));
+  const technicalStrong = technical.filter(f => f.level === 'strong');
+  const technicalMedium = technical.filter(f => f.level === 'medium');
+  let verdict, evidence, scale;
+  if (technicalStrong.length) {
+    verdict = 'Обнаружены специфические технические маркеры, требующие проверки происхождения фрагментов';
+    evidence = 'специфические технические';
+  } else if (technicalMedium.length >= 2) {
+    verdict = 'Обнаружено сочетание косвенных технических маркеров веб-обработки документа';
+    evidence = 'косвенные технические';
+  } else if (F.some(f => ['comp', 'src'].includes(f.group) && f.level !== 'info') && !technicalMedium.length) {
+    verdict = 'Выявлены замечания к структуре документа и ссылкам; специфических технических следов не обнаружено';
+    evidence = 'замечания к качеству документа';
   } else if (F.some(f => f.id === 'styloA' && f.level === 'medium')) {
-    verdict = 'Технических следов ИИ не выявлено; лексический профиль текста близок к текстам LLM';
-    conf = 'низкая';
-  } else if (F.some(f => f.id === 'styloA' && f.level === 'weak') && !F.some(f => ['tech', 'meta', 'chars', 'text'].includes(f.group) && ['strong', 'medium'].includes(f.level))) {
-    verdict = 'Технических следов ИИ не выявлено; есть отдельные стилистические признаки возможной правки текста с помощью ИИ';
-    conf = 'низкая';
-  } else if (medium.length || weak.length >= 3) {
-    verdict = 'Выявлены отдельные слабые признаки; прямых признаков не обнаружено';
-    conf = 'низкая';
+    verdict = 'Лексический профиль имеет сходство с некоторыми текстами LLM; технического подтверждения нет';
+    evidence = 'стилометрические, неспецифичные';
+  } else if (F.some(f => f.id === 'styloA' && f.level === 'weak') && !technicalMedium.length) {
+    verdict = 'Есть отдельные стилометрические особенности; технического подтверждения нет';
+    evidence = 'слабые, неспецифичные';
+  } else if (technicalMedium.length || medium.length || weak.length >= 3) {
+    verdict = 'Есть отдельные косвенные признаки; оснований для вывода о происхождении текста недостаточно';
+    evidence = 'отдельные косвенные';
   } else {
-    verdict = 'Признаков применения генеративного ИИ не выявлено';
-    conf = '—';
+    verdict = 'Специфических технических следов не выявлено; происхождение текста не установлено';
+    evidence = 'не выявлены';
   }
-  if (share >= 50) scale = 'системное (признак охватывает большую часть связного текста)';
-  else if (share >= 10) scale = 'существенное, фрагментарное';
-  else if (share > 0) scale = 'эпизодическое';
-  else if (res.stats.runMarkedParas) scale = `фрагментарное: веб-разметка сохранилась внутри ${fmtNum(res.stats.runMarkedParas)} абзацев/ячеек (${fmtNum(res.stats.runMarkedWords)} слов)`;
-  else scale = 'не оценивается по стилям (размеченный текст не обнаружен)';
-  res.verdict = { text: verdict, confidence: conf, scale, mainSource: mainSrc, share };
+  // Это охват сохранившейся РАЗМЕТКИ, а не процент текста, созданного ИИ.
+  if (share > 0) scale = `разметка на уровне абзацев охватывает ${fmtPct(share)} основного текста`;
+  else if (res.stats.runMarkedParas) scale = `разметка отдельных фрагментов: ${fmtNum(res.stats.runMarkedParas)} абзацев/ячеек, ${fmtNum(res.stats.runMarkedWords)} слов`;
+  else scale = 'диагностическая разметка на уровне абзацев не найдена';
+  res.verdict = { text: verdict, evidence, scale, mainSource: mainSrc, share };
 
   const human = [];
   if (res.meta.tables) human.push(`таблицы (${res.meta.tables})`);
@@ -1874,8 +1878,8 @@ async function buildReportDocx(res) {
 
   /* ---------- титул ---------- */
   out.push(para('ВНЕПРОЦЕССУАЛЬНОЕ ИССЛЕДОВАНИЕ', { style: 'Caps' }));
-  out.push(para('ЭКСПЕРТНО-АНАЛИТИЧЕСКОЕ ЗАКЛЮЧЕНИЕ', { style: 'Title' }));
-  out.push(para('о наличии и характере применения технологий генеративного искусственного интеллекта при подготовке документа', { style: 'Subtitle' }));
+  out.push(para('ОТЧЁТ ПРЕДВАРИТЕЛЬНОГО АУДИТА', { style: 'Title' }));
+  out.push(para('о технических, структурных и текстологических признаках в документе (без установления авторства)', { style: 'Subtitle' }));
   out.push(para(docTitle.length > 220 ? docTitle.slice(0, 220) + '…' : docTitle, { style: 'Subtitle' }));
   out.push(para('', { spacingAfter: 0 }));
   out.push(table([
@@ -1886,14 +1890,14 @@ async function buildReportDocx(res) {
     ['SHA-256', { t: res.file.sha256, mono: true }],
     ['Дата исследования', dt],
   ], [2600, 6755]));
-  out.push(para('Заключение подготовлено по представленной электронной копии документа', { style: 'Small', align: 'center' }));
+  out.push(para('Отчёт сформирован автоматически по электронной копии документа; авторство и факт генерации не устанавливаются', { style: 'Small', align: 'center' }));
 
   /* ---------- резюме ---------- */
   out.push(H1('Краткое резюме'));
-  const summ = [v.text + (v.confidence !== '—' ? ` (уверенность — ${v.confidence}).` : '.')];
-  if (v.mainSource) summ.push(`Наиболее вероятный источник по техническим следам: ${v.mainSource}. Характер использования: ${v.scale}.`);
+  const summ = [v.text + `. Характер признаков: ${v.evidence}.`];
+  if (v.mainSource) summ.push(`Обнаружена разметка, сходная с оформлением: ${v.mainSource}. Охват: ${v.scale}. Это не устанавливает авторство текста.`);
   summ.push(`Выявлено признаков: сильных — ${s.counts.strong}, средних — ${s.counts.medium}, слабых — ${s.counts.weak}, справочных — ${s.counts.info}.`);
-  out.push(box('Итоговая экспертная оценка', summ));
+  out.push(box('Предварительная оценка обнаруженных признаков', summ));
   const complexes = [];
   if (usedWeb.length) complexes.push(`Пользовательские стили веб-происхождения (${[...new Set(usedWeb.map(f => f.style.source))].join('; ')}): ${usedWeb.map(f => `«${f.style.name}» — ${[f.style.paras ? fN(f.style.paras) + ' абз.' : '', f.style.runs ? fN(f.style.runs) + ' фрагм.' : '', fN((f.style.words || 0) + (f.style.runWords || 0)) + ' сл.'].filter(Boolean).join(', ')}`).join('; ')}.`.replace('..', '.'));
   if (byId('links:google')) complexes.push(`Гиперссылки через переадресацию Google: ${fN(L.redirect)} из ${fN(L.total)} (${fmtPct(pct(L.redirect, L.total))}).`);
@@ -1902,7 +1906,7 @@ async function buildReportDocx(res) {
   if (byId('meta:gen')) complexes.push('Метаданные указывают на программную генерацию файла.');
   if (complexes.length) { out.push(P('Установлены следующие технические комплексы признаков:')); out.push(...NUM(complexes)); }
   if (s.localization && s.localization.length) out.push(P(`Технические маркеры распределены по ${s.localization.length} зонам, из них ${s.localization.filter(l => l.inTable).length} — в таблицах: ${s.localization.slice(0, 5).map(l => `${l.where.slice(0, 90)} (${l.pages})`).join('; ')}.`));
-  if (res.human.length) out.push(P('Одновременно файл содержит признаки самостоятельной работы: ' + res.human.join(', ') + '. ' + (s.counts.strong || s.counts.medium ? 'Наиболее корректная квалификация при таком сочетании — гибридная подготовка документа.' : '')));
+  if (res.human.length) out.push(P('Дополнительные особенности структуры и редактирования: ' + res.human.join(', ') + '. Они не подтверждают самостоятельное либо машинное авторство.'));
   const bounds = ['По одному итоговому файлу невозможно установить точную долю первоначально машинного текста, конкретную модель и её версию, содержание запросов, личность пользователя, последовательность редакций и степень переработки каждого фрагмента. Для этого необходимы исходные рабочие файлы, история версий, переписка с моделью, данные браузера и облачных сервисов.'];
   if (usedWeb.some(f => /Angular|Tailwind/.test(f.style.source))) bounds.push('Классы Angular и Tailwind являются маркерами веб-фреймворков, а не уникальными «водяными знаками» генеративной модели; их доказательственное значение возрастает только в совокупности с другими признаками.');
   bounds.push('Не проверялись статистические водяные знаки разработчиков моделей (Anthropic Claude, Google SynthID и др.): их обнаружение возможно только инструментами этих компаний. Заключение сформировано автоматически и подлежит оценке специалистом.');
@@ -1913,10 +1917,10 @@ async function buildReportDocx(res) {
   out.push(P(`Объектом исследования являлся электронный файл «${res.file.name}»` + (docTitle !== res.file.name ? `, содержащий работу «${docTitle.replace(/^[«"]|[»"]$/g, '')}»` : '') + `. В состав документа входят: ${[m.captionsTab ? `${fN(m.captionsTab)} подписанных таблиц` : '', m.captionsFig ? `${fN(m.captionsFig)} рисунков` : '', m.formulas ? `${fN(m.formulas)} формул` : '', m.appendices ? `${fN(m.appendices)} приложений` : '', res.footnotes.length ? `${fN(res.footnotes.length)} сносок` : '', s.bib ? `список литературы из ${fN(s.bib.items)} записей` : ''].filter(Boolean).join(', ') || 'текст без выделенных структурных элементов'}.`));
   out.push(P('Предмет исследования — сохранившиеся в контейнере DOCX технические признаки происхождения и маршрута переноса текста, особенности структуры и редактирования файла, а также текстологические и содержательные признаки, совместимые с применением генеративных языковых моделей.'));
   out.push(P('На разрешение были поставлены следующие вопросы:'));
-  out.push(...NUM(['Имеются ли в представленном файле признаки применения генеративного искусственного интеллекта при подготовке текста и аналитических материалов?',
-    'Каков наиболее вероятный характер такого применения: техническая коррекция, поиск информации, генерация, перефразирование, систематизация или компоновка материалов?',
-    'Позволяют ли технические данные определить наиболее вероятный сервис или семейство веб-интерфейсов, через которые переносился контент?',
-    'Имеются ли признаки самостоятельной человеческой работы и последующей ручной доработки документа?',
+  out.push(...NUM(['Какие специфические и косвенные технические маркеры присутствуют в файле?',
+    'Где расположены выявленные маркеры и каков охват сохранившейся разметки?',
+    'С разметкой каких веб-интерфейсов обнаружены совпадения и насколько они специфичны?',
+    'Какие сведения об истории редактирования и структуре доступны в итоговом файле?',
     'Какие обстоятельства не могут быть достоверно установлены только по исследованному файлу?']));
 
   /* ---------- 2 ---------- */
@@ -2046,59 +2050,59 @@ async function buildReportDocx(res) {
   const cf2 = gf('comp').filter(f => !['comp:fielderr', 'rep'].includes(f.id)); if (cf2.length) cf2.forEach(f => finding(f, 3)); else out.push(P('Признаков не обнаружено.'));
 
   /* ---------- 5 ---------- */
-  out.push(H1('5. Признаки человеческого участия и гибридный характер подготовки'));
+  out.push(H1('5. Особенности структуры и редактирования (без вывода об авторстве)'));
   const hrows = [];
-  if (m.addins && m.addins.length) hrows.push(['Менеджер библиографии', m.addins.join(', '), 'Ручная либо полуавтоматизированная работа с источниками']);
+  if (m.addins && m.addins.length) hrows.push(['Менеджер библиографии', m.addins.join(', '), 'Наличие программного менеджера ссылок']);
   if (m.chartExternal || m.charts) hrows.push(['Диаграммы и Excel', `${fN(m.charts)} диаграмм Word, ${fN(m.chartExternal)} внешних связей${m.xlsxTargets && m.xlsxTargets.length ? ' (' + m.xlsxTargets.slice(0, 3).join(', ') + ')' : ''}`, 'Наличие отдельного расчётно-графического контура']);
-  if (F.some(f => f.id === 'style:excel') && !res.styles.some(x => (x.category === 'webui' || x.category === 'hash') && (x.paras || x.runs))) hrows.push(['Таблицы из Excel', byId('style:excel').detail, 'Работа с собственными расчётными таблицами']);
-  hrows.push(['Структура исследования', `${fN(m.captionsTab)} таблиц, ${fN(m.captionsFig)} рисунков, ${fN(m.formulas)} формул, ${fN(m.appendices)} приложений`, 'Сложная сборка и форматирование']);
-  if (m.distinctRsids) hrows.push(['rsid', `${fN(m.distinctRsids)} уникальных идентификаторов редактирования`, 'Множественные операции изменения и вставки']);
-  if (byId('comp:notes')) hrows.push(['Рабочие заметки', `${fN(byId('comp:notes').value)} заметок`, 'Незавершённость и ручная сборка']);
-  if (m.comments || m.insertions || m.deletions) hrows.push(['Рецензирование', `${fN(m.comments)} комментариев, ${fN((m.insertions || 0) + (m.deletions || 0))} исправлений`, 'Следы совместной правки']);
+  if (F.some(f => f.id === 'style:excel') && !res.styles.some(x => (x.category === 'webui' || x.category === 'hash') && (x.paras || x.runs))) hrows.push(['Таблицы из Excel', byId('style:excel').detail, 'Вставка данных из Excel; происхождение расчётов неизвестно']);
+  hrows.push(['Структура исследования', `${fN(m.captionsTab)} таблиц, ${fN(m.captionsFig)} рисунков, ${fN(m.formulas)} формул, ${fN(m.appendices)} приложений`, 'Наличие структурных элементов без подтверждения автора']);
+  if (m.distinctRsids) hrows.push(['rsid', `${fN(m.distinctRsids)} уникальных идентификаторов редактирования`, 'Служебные отметки изменений, не идентифицирующие автора']);
+  if (byId('comp:notes')) hrows.push(['Рабочие заметки', `${fN(byId('comp:notes').value)} заметок`, 'Остатки рабочего редактирования']);
+  if (m.comments || m.insertions || m.deletions) hrows.push(['Рецензирование', `${fN(m.comments)} комментариев, ${fN((m.insertions || 0) + (m.deletions || 0))} исправлений`, 'Следы комментариев и правок; участники не устанавливаются']);
   out.push(table([['Признак', 'Фактическое содержание', 'Значение'], ...hrows], [2400, 4200, 2755], { header: true }));
-  out.push(P(res.human.length && (s.counts.strong || s.counts.medium) ? 'Совокупность этих данных исключает представление о документе как о едином ответе чат-бота, целиком вставленном в Word. Наиболее вероятно, что человек формировал структуру исследования, собирал данные, выполнял расчёты, создавал таблицы и схемы, а генеративный ИИ использовался для подготовки отдельных формулировок, систематизации, классификаций или описания результатов. Технически невозможно определить, какие идеи принадлежали автору, а какие были предложены моделью.' : 'Признаки человеческого участия учитываются при квалификации документа.'));
+  out.push(P('Перечисленные элементы описывают устройство и редактирование файла. Они совместимы как с работой человека, так и с программной сборкой и участием ИИ. Их нельзя использовать для подтверждения самостоятельного авторства или объявлять документ «гибридным» без внешних доказательств.'));
+
 
   /* ---------- 6 ---------- */
-  out.push(H1('6. Альтернативные объяснения и оценка их вероятности'));
-  const specific = F.some(f => f.level === 'strong' || (f.style && f.style.category === 'webui' && !/Angular|Tailwind|KaTeX|MathJax/.test(f.style.source) && f.value > 0));
-  const generic = usedWeb.length > 0 || F.some(f => f.style && ['html', 'hash'].includes(f.style.category) && f.value > 0);
+  out.push(H1('6. Альтернативные объяснения выявленных признаков'));
   const hyp = [
-    ['Полностью самостоятельное написание без ИИ', 'Может объяснить расчёты, таблицы, менеджеры библиографии, ошибки редактирования', specific ? 'Не объясняет технические следы веб-интерфейсов нейросетей и сопутствующие признаки' : 'Не опровергается имеющимися данными', specific ? 'Маловероятно' : generic ? 'Возможно' : 'Вероятно'],
-    ['Копирование из обычных веб-страниц (не нейросетей)', 'Объясняет общие классы HTML, Angular, Tailwind', specific ? 'Не объясняет признаки, специфичные для конкретного сервиса' : 'Основное альтернативное объяснение', specific ? 'Возможно, но недостаточно' : generic ? 'Возможно' : 'Не требуется'],
+    ['Самостоятельно написанный текст, вставленный через веб-редактор', 'Объясняет веб-стили без машинной генерации содержания', 'Нужны исходные редакции и история создания', 'Не исключено'],
+    ['Перенос текста из обычных веб-страниц', 'Может объяснять общие классы HTML, Angular, Tailwind и библиотеки формул', 'Специфичные сигнатуры требуют проверки', 'Не исключено'],
+    ['Редактирование с помощью языковой модели', 'Совместимо со стилями чат-интерфейсов и остатками ответов', 'Одна разметка не подтверждает способ создания текста', 'Не установлено'],
   ];
-  if (v.mainSource) hyp.push([`Использование ${v.mainSource} для части материалов`, 'Объясняет технические маркеры, их локализацию и сопутствующие содержательные сбои', 'Не позволяет определить модель, объём и неизменность текста', s.counts.strong ? 'Наиболее вероятно' : 'Возможно']);
-  const srcCount = new Set(F.filter(f => f.style && f.style.category === 'webui').map(f => f.style.source)).size;
-  if (srcCount > 1) hyp.push(['Использование нескольких ИИ- и веб-сервисов', `Согласуется с ${srcCount} разными семействами веб-стилей в файле`, 'Часть стилей не применена к тексту и не позволяет надёжно идентифицировать сервис', 'Не исключается']);
-  out.push(table([['Гипотеза', 'Что объясняет', 'Что не объясняет / ограничения', 'Оценка'], ...hyp], [2300, 2600, 2900, 1555], { header: true }));
+  if (v.mainSource) hyp.push(['Перенос через интерфейс ' + v.mainSource, 'Соответствует части обнаруженных имён стилей', 'Сервис мог использоваться только для просмотра или редактирования', 'Требует проверки']);
+  out.push(table([['Объяснение', 'Что согласуется', 'Недостающие данные', 'Статус'], ...hyp], [2300, 2600, 2900, 1555], { header: true }));
 
   /* ---------- 7 ---------- */
-  out.push(H1('7. Интегральная оценка'));
-  out.push(table([['Обстоятельство', 'Вывод', 'Уверенность'],
-    ['Факт применения генеративного ИИ', v.text, v.confidence],
-    ['Связь с конкретным сервисом', v.mainSource ? `Наиболее вероятен ${v.mainSource}` : 'Не установлена', v.mainSource ? (s.counts.strong ? 'высокая, но не абсолютная' : 'средняя') : '—'],
-    ['Характер и масштаб применения', v.scale, '—'],
-    ['Затронутые содержательные блоки', s.localization && s.localization.length ? `${s.localization.length} зон, в т. ч. ${s.localization.filter(l => l.inTable).length} таблиц` : 'не установлены', '—'],
-    ['Полностью машинное создание документа', res.human.length ? 'Не подтверждается: есть признаки ручной работы' : 'По файлу не устанавливается', '—'],
-    ['Точная доля текста, созданного ИИ', 'По одному файлу не определяется', '—']], [3000, 4155, 2200], { header: true }));
+  out.push(H1('7. Сводная оценка и пределы установления'));
+  out.push(table([['Обстоятельство', 'Результат', 'Пределы вывода'],
+    ['Выявленные маркеры', v.text, v.evidence],
+    ['Предполагаемый источник оформления', v.mainSource || 'Не установлен', 'Совпадение классов не идентифицирует автора или модель'],
+    ['Охват диагностической разметки', v.scale, 'Не равен доле текста, созданного ИИ'],
+    ['Затронутые разделы и таблицы', s.localization && s.localization.length ? s.localization.length + ' зон, в т. ч. ' + s.localization.filter(l => l.inTable).length + ' таблиц' : 'Не установлены', 'Зависит от сохранившейся разметки'],
+    ['Авторство и способ создания текста', 'Не устанавливаются по одному DOCX', 'Требуются независимые данные'],
+    ['Точная доля текста, созданного ИИ', 'Не определяется', 'Нет валидированного метода для данного файла']], [3000, 4155, 2200], { header: true }));
 
   /* ---------- 8 ---------- */
   out.push(H1('8. Выводы на поставленные вопросы'));
   const concl = [];
   const strongF = F.filter(f => f.level === 'strong'), medF = F.filter(f => f.level === 'medium');
-  concl.push(strongF.length ? `В файле имеются прямые признаки применения генеративного ИИ (${strongF.length}): ${strongF.map(f => f.title.toLowerCase()).join('; ')}.` : medF.length ? `Прямых признаков не выявлено; имеются косвенные признаки (${medF.length}): ${medF.map(f => f.title.toLowerCase()).join('; ')}.` : 'Прямых и косвенных технических признаков применения генеративного ИИ не выявлено; это не исключает использования ИИ с последующей глубокой переработкой текста.');
-  if (s.localization && s.localization.length) concl.push(`Технические маркеры локализованы в ${s.localization.length} зонах; ${s.markedBodyWords ? `на уровне абзацев они охватывают ${fmtPct(s.markedShare)} связного текста` : `на уровне фрагментов — ${fN(s.runMarkedWords)} слов`}. Характер применения: ${v.scale}.`);
-  if (v.mainSource) concl.push(`Совпадение технических классов с разметкой веб-интерфейсов даёт основания связать происхождение части материалов с сервисом ${v.mainSource}.`);
+
+  concl.push(strongF.length ? 'Обнаружены специфические маркеры (' + strongF.length + '): ' + strongF.map(f => f.title.toLowerCase()).join('; ') + '. Они относятся к файлу и не доказывают машинное авторство.' : medF.length ? 'Обнаружены косвенные маркеры (' + medF.length + '): ' + medF.map(f => f.title.toLowerCase()).join('; ') + '. Они неспецифичны.' : 'Специфических маркеров не выявлено. Отсутствие следов не исключает использования ИИ.');
+  if (s.localization && s.localization.length) concl.push('Следы разметки локализованы в ' + s.localization.length + ' зонах. ' + v.scale + '. Это показатель разметки, а не доля машинного текста.');
+  if (v.mainSource) concl.push('Часть технических классов сходна с оформлением веб-интерфейса: ' + v.mainSource + '. Сведения об авторстве этим не устанавливаются.');
   const contentIds = ['alien', 'numdup', 'categorical', 'citations', 'language', 'fields:ref'].map(byId).filter(f => f && f.level !== 'info');
-  if (contentIds.length) concl.push(`Содержательные признаки — ${contentIds.map(f => f.title.toLowerCase() + ` (${fN(f.value)})`).join('; ')} — сами по себе ИИ не доказывают, но указывают на зоны недостаточной верификации.`);
-  if (res.human.length) concl.push('Документ содержит существенный человеческий вклад; ' + (s.counts.strong || s.counts.medium ? 'наиболее обоснованная квалификация — гибридный документ, подготовленный при содействии генеративного ИИ.' : 'признаков машинной подготовки недостаточно для иной квалификации.'));
-  concl.push('По одной электронной копии нельзя достоверно установить точный процент первоначально машинного текста, модель и её версию, содержание запросов, степень изменения каждого фрагмента и лицо, выполнявшее работу.');
+  if (contentIds.length) concl.push('Замечания к качеству документа: ' + contentIds.map(f => f.title.toLowerCase() + ' (' + fN(f.value) + ')').join('; ') + '. Они требуют проверки независимо от гипотезы об ИИ.');
+  if (res.human.length) concl.push('В файле есть структурные элементы и признаки редактирования; они не подтверждают способ создания содержимого.');
+  concl.push('По одному файлу нельзя установить автора, факт генерации, точный процент машинного текста, модель, запросы или последовательность переработки. Отчёт предназначен для предварительной проверки специалистом.');
+
   out.push(...NUM(concl));
 
   /* ---------- 9 ---------- */
   out.push(H1('9. Рекомендации'));
   const pagesOf = id => { const f = byId(id); return f ? [...new Set((f.examples || []).map(e => (e.text.match(/^с\. \d+/) || [])[0]).filter(Boolean))].slice(0, 8).join(', ') : ''; };
   out.push(...NUM(['Сохранить исследованный файл без изменений вместе с контрольной суммой; исправления вносить только в копию.',
-    s.localization && s.localization.length ? `Переработать и заново сформулировать содержание блоков с веб-разметкой: ${s.localization.slice(0, 6).map(l => l.where.replace(/ — .*/, '') + ' (' + l.pages + ')').join('; ')}.` : null,
+    s.localization && s.localization.length ? `Проверить происхождение фрагментов с веб-разметкой и корректность ссылок на источники: ${s.localization.slice(0, 6).map(l => l.where.replace(/ — .*/, '') + ' (' + l.pages + ')').join('; ')}.` : null,
     byId('alien') ? `Проверить и адаптировать предметно-чужеродные фрагменты: ${pagesOf('alien')}.` : null,
     byId('citations') ? `Выполнить постраничную сверку с первоисточниками мест, где утверждения идут без ссылки или автор не совпадает с источником: ${pagesOf('citations')}.` : null,
     byId('numdup') ? 'Подтвердить первичными данными (анкетами, расчётными таблицами) совпадающие числовые структуры и независимо воспроизвести расчёты.' : null,
@@ -2116,7 +2120,7 @@ async function buildReportDocx(res) {
     out.push(P(`Абзацев с признаками: ${fN(zone.length)}. Приведены первые ${Math.min(zone.length, 200)} в порядке следования.`));
     out.push(table([['Абз.', 'Стр.', 'Место', 'Признаки', 'Начало абзаца'], ...zone.slice(0, 200).map(p => [String(p.i + 1), p.page ? String(p.page) : '', p.table != null ? tableLabel(res, p.table) : p.section.slice(0, 40), [...new Set(p.flags.filter(f => f.level !== 'info').map(f => f.label))].slice(0, 3).join('; '), snippet(p.text, null, 90)])], [650, 650, 1700, 3100, 3255], { header: true }));
   } else out.push(P('Абзацев с признаками нет.'));
-  out.push(para(`Заключение сформировано автоматически программой «Проверка DOCX на признаки ИИ» v${APP_VERSION} ${res.date.toLocaleString('ru-RU')}. Результаты носят вероятностный характер и подлежат оценке специалистом.`, { style: 'Small' }));
+  out.push(para(`Отчёт сформирован автоматически программой «Проверка DOCX на признаки ИИ» v${APP_VERSION} ${res.date.toLocaleString('ru-RU')}. Признаки не доказывают авторство или генерацию и требуют независимой экспертной оценки.`, { style: 'Small' }));
 
   const body = out.join('');
   const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -2131,7 +2135,7 @@ async function buildReportDocx(res) {
   z.file('word/numbering.xml', numberingXml());
   z.file('word/footer1.xml', footer);
   const iso = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-  z.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Заключение о признаках применения ИИ — ${X(res.file.name)}</dc:title><dc:creator>Проверка DOCX на признаки ИИ v${APP_VERSION}</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${iso}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${iso}</dcterms:modified></cp:coreProperties>`);
+  z.file('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Предварительный аудит DOCX — ${X(res.file.name)}</dc:title><dc:creator>Проверка DOCX на признаки ИИ v${APP_VERSION}</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${iso}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${iso}</dcterms:modified></cp:coreProperties>`);
   return await z.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 }
 
@@ -2209,11 +2213,11 @@ async function buildAnnotatedDocx(res) {
   const firstIdx = res.paras.findIndex(p => p.words > 0 && !p.inBox && !p.inTable);
   const v = res.verdict, s = res.stats;
   if (firstIdx >= 0 && all[firstIdx]) addComment(all[firstIdx], [
-    'Проверка на признаки ИИ: ' + v.text,
-    v.mainSource ? `Вероятный источник: ${v.mainSource}; разметка веб-интерфейса в ${fmtPct(s.markedShare)} связного текста.` : 'Разметки веб-интерфейсов нейросетей не найдено.',
+    'Предварительная проверка маркеров: ' + v.text,
+    v.mainSource ? `Сходство оформления с ${v.mainSource}; разметка на уровне абзацев в ${fmtPct(s.markedShare)} основного текста. Это не устанавливает авторство.` : 'Разметки веб-интерфейсов нейросетей не найдено.',
     `Признаков: сильных ${s.counts.strong}, средних ${s.counts.medium}, слабых ${s.counts.weak}.`,
     'Подсветка: розовая — сильный признак, жёлтая — средний, голубая — слабый. Комментарий у абзаца перечисляет найденное.',
-    'Это копия для анализа; исходный файл не изменён.',
+    'Это копия для проверки специалистом; признаки не доказывают генерацию или авторство. Исходный файл не изменён.',
   ]);
 
   res.paras.forEach((para, i) => {
@@ -2314,14 +2318,14 @@ function render(r) {
   $('#verdict').className = 'verdict ' + vClass;
   $('#verdict').innerHTML = `
     <div class="v-head"><div><div class="eyebrow">Итоговая оценка</div><h2>${esc(v.text)}</h2></div>
-      ${v.confidence !== '—' ? `<div class="conf">уверенность<br><b>${esc(v.confidence)}</b></div>` : ''}</div>
-    <p>${v.mainSource ? `Наиболее вероятный источник по техническим следам: <b>${esc(v.mainSource)}</b>. Характер использования: ${esc(v.scale)}.` : 'Разметки веб-интерфейсов нейросетей в тексте не найдено.'}</p>
-    ${r.human.length ? `<p class="muted">Признаки самостоятельной работы: ${esc(r.human.join(', '))}.</p>` : ''}
+      ${v.evidence !== 'не выявлены' ? `<div class="conf">характер признаков<br><b>${esc(v.evidence)}</b></div>` : ''}</div>
+    <p>${v.mainSource ? `Разметка, сходная с оформлением:  <b>${esc(v.mainSource)}</b>. Охват разметки: ${esc(v.scale)}.` : 'Разметки веб-интерфейсов нейросетей в тексте не найдено.'}</p>
+    ${r.human.length ? `<p class="muted">Структура и следы редактирования:  ${esc(r.human.join(', '))}.</p>` : ''}
     <p class="muted small">Файл: ${esc(r.file.name)} · ${fmtNum(r.file.size)} байт · SHA-256 <code>${r.file.sha256}</code></p>`;
 
   $('#kpis').innerHTML = [
-    ['Текст с разметкой веб-интерфейса', r.kind === 'docx' ? fmtPct(s.markedShare || 0) : '—', r.kind === 'docx' ? `${fmtNum(s.markedBodyWords || 0)} из ${fmtNum(s.bodyWords)} слов основного текста` : 'для .txt не определяется'],
-    ['Сильные признаки', s.counts.strong, 'прямые следы ИИ'],
+    ['Текст с разметкой веб-интерфейса', r.kind === 'docx' ? fmtPct(s.markedShare || 0) : '—', r.kind === 'docx' ? `${fmtNum(s.markedBodyWords || 0)} из ${fmtNum(s.bodyWords)} слов основного текста` : 'для текстовых файлов не определяется'],
+    ['Сильные признаки', s.counts.strong, 'маркеры, требующие проверки'],
     ['Средние признаки', s.counts.medium, 'косвенные технические'],
     ['Слабые признаки', s.counts.weak, 'статистические, неспецифичные'],
   ].map(([t, n, d]) => `<div class="kpi"><div class="kpi-t">${t}</div><div class="kpi-n">${n}</div><div class="kpi-d">${esc(d)}</div></div>`).join('');
