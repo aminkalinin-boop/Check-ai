@@ -9,13 +9,13 @@ function shortTextAudit(res, body) {
   const blocks = body.filter(p => p.words >= 20);
   const content = blocks.map(p => p.text).join(' ');
   // Narrowly anchored language patterns; this is NOT a machine-specific watermark.
-  const hedges = /(?:\b(?:неизвестн|отсутству|недостаточн|невозможн|не\s+установлен|не\s+позволя|не\s+подтвержден|не\s+доказан|не\s+представлен|не\s+задан|не\s+раскрыв|нельзя\s+определить)[а-яё]*\b)/giu;
-  const method = /(?:\b(?:метод(?:ик|ическ)?|исследовательск|расч[её]т|сопоставлени|показател|интерпретаци|выборк|инвестиц|анализ)[а-яё]*\b)/giu;
-  const quantified = /\b\d+(?:[.,]\d+)?\s*(?:%|процент|млн|тыс|дн[яей]|года?|лет)\b/giu;
+  const hedges = /(?<!\p{L})(?:неизвестн|отсутству|недостаточн|невозможн|не\s+установлен|не\s+позволя|не\s+подтвержден|не\s+доказан|не\s+представлен|не\s+задан|не\s+раскрыв|нельзя\s+определить)\p{L}*(?!\p{L})/giu;
+  const method = /(?<!\p{L})(?:метод(?:ик|ическ)?|исследовательск|расч[её]т|сопоставлени|показател|интерпретаци|выборк|инвестиц|анализ)\p{L}*(?!\p{L})/giu;
+  const quantified = /(?<!\d)\d+(?:[.,]\d+)?\s*(?:%|процент|млн|тыс|дн[яей]|года?|лет)(?!\p{L})/giu;
   const wordTokens = (t) => (t.toLowerCase().match(/\p{L}{5,}/gu) || []);
   const paraProfiles = blocks.map(p => {
     const words = wordTokens(p.text);
-    const repeated = words.filter(w => /\b(?:анализ|данн|результ|показател|инвестиц|исследован)/iu.test(w));
+    const repeated = words.filter(w => /(?:анализ|данн|результ|показател|инвестиц|исследован)/iu.test(w));
     const methodMatches = (p.text.match(method) || []).length;
     const constraints = (p.text.match(hedges) || []).length;
     const numbers = (p.text.match(quantified) || []).length;
