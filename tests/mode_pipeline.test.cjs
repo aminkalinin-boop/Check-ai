@@ -17,7 +17,7 @@ test('End-user UI cannot ask for an API URL or model access token', () => {
   assert.match(addon, /online\.textContent = 'Онлайн'/);
 });
 test('Online additions start only from same local analysis-ready event', () => {
-  assert.match(ui, /await analyzeFile\(file, setStatus\)/);
+  assert.match(ui, /await analyzeFile\(file, setStatus(?:,|\))/);
   assert.match(ui, /render\(RES\)/);
   assert.match(ui, /check-ai:analysis-ready/);
   assert.match(addon, /check-ai:analysis-ready/);
