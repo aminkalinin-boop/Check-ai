@@ -31,7 +31,12 @@ function annotationAdvice(flag, para) {
   const exact = linguistic && matching.length ? primary : null;
   const kb = exact ? knowledgeSourceEntry(exact.id) : null;
   const kbNote = kb ? ' База знаний: ' + kb.title + '; статус ' + kb.evidence_status + '; источник(и): ' + kb.source_ids.join(', ') + '. ' + kb.interpretation : '';
+  const authorNotes=authorGuidelineMatches(para?.text||'',3).map(m=>({
+    title:m.title,quote:m.quote,section:m.section,action:m.action,
+    explanation:'Индивидуальное редакционное правило, не свидетельство ИИ-авторства.'
+  }));
   return {
+    authorNotes,
     issue: exact ? exact.title + '. ' + exact.evidence : observed,
     action: exact ? exact.action : action,
     reason: (exact ? exact.interpretation : 'Собственное правило Check-AI отметило: «' + label + '». Этого недостаточно для установления авторства.') + kbNote,
