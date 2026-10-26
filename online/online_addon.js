@@ -65,7 +65,7 @@
     consent.style.display = 'block';
     const agree = document.createElement('input');
     agree.type = 'checkbox';
-    consent.append(agree, document.createTextNode(' Согласен отправить только показанные фрагменты и библиографические записи серверу онлайн-экспертизы и в API модели.'));
+    consent.append(agree, document.createTextNode(' Разрешаю передавать показанные фрагменты выбранному онлайн-сервису: API модели либо библиографические записи в Crossref.'));
     const token = document.createElement('input');
     token.type = 'password';
     token.autocomplete = 'off';
@@ -82,6 +82,10 @@
     run.type = 'button';
     run.className = 'primary';
     run.textContent = 'Запустить дополнительный ИИ-анализ';
+    const crossref = document.createElement('button');
+    crossref.type = 'button';
+    crossref.textContent = 'Сверить список литературы с Crossref';
+    crossref.style.marginLeft = '8px';
     const manual = document.createElement('button');
     manual.type = 'button';
     manual.style.marginLeft = '8px';
@@ -89,7 +93,8 @@
     const status = document.createElement('p');
     status.setAttribute('role', 'status');
     const output = document.createElement('div');
-    panel.append(heading, explanation, preview, consent, token, run, manual, status, output);
+    const crossrefOutput = document.createElement('div');
+    panel.append(heading, explanation, preview, consent, token, run, crossref, manual, status, output, crossrefOutput);
     const verdict = document.getElementById('verdict');
     verdict.parentNode.insertBefore(panel, verdict);
 
@@ -198,6 +203,60 @@
       } catch (e) {
         status.textContent = 'Ошибка онлайн-анализа: ' + e.message;
       } finally { run.disabled = false; }
+    });
+    crossref.addEventListener('click', async () => {
+      if (currentMode !== 'online') return;
+      const entries = chosen().bibliography.slice(0, 6);
+      if (!entries.length) { status.textContent = 'В документе не найден размеченный список литературы для проверки.'; return; }
+      if (!agree.checked) { status.textContent = 'Подтвердите согласие на запросы к Crossref (передаются библиографические записи).'; return; }
+      crossref.disabled = true;
+      crossrefOutput.replaceChildren();
+      const head = document.createElement('h3');
+      head.textContent = 'Сверка библиографии в Crossref (справочно)';
+      crossrefOutput.append(head);
+      const note = document.createElement('p');
+      note.className = 'muted small';
+      note.textContent = 'Сверяются первые ' + entries.length + ' записей. Не все публикации и российские журналы присутствуют в Crossref. Отсутствие совпадения не означает выдуманную публикацию; найденное совпадение требуется проверить.';
+      crossrefOutput.append(note);
+      let checked = 0;
+      for (const entry of entries) {
+        status.textContent = 'Сверка Crossref: ' + (checked + 1) + ' из ' + entries.length + '…';
+        const row = document.createElement('p');
+        row.className = 'small';
+        row.textContent = 'Запись №' + entry.paragraph + ': ';
+        try {
+          const doiMatch = entry.text.match(/10\.\d{4,9}\/[^\s;,)}\]]+/i);
+          const doi = doiMatch ? doiMatch[0].replace(/[.,;]+$/, '') : '';
+          const url = doi
+            ? 'https://api.crossref.org/works/' + encodeURIComponent(doi)
+            : 'https://api.crossref.org/works?rows=1&query.bibliographic=' + encodeURIComponent(entry.text.slice(0, 350));
+          const resp = await fetch(url, { signal: AbortSignal.timeout(12000) });
+          if (!resp.ok) {
+            row.textContent += resp.status === 404 ? 'DOI не найден в Crossref (не доказательство ошибки).' : 'Ответ Crossref HTTP ' + resp.status + '; проверка не завершена.';
+          } else {
+            const json = await resp.json();
+            const found = doi ? json.message : json.message?.items?.[0];
+            if (!found) {
+              row.textContent += 'В Crossref нет доступного совпадения. Требуется проверка по другим базам.';
+            } else {
+              row.textContent += (doi ? 'DOI зарегистрирован в Crossref. ' : 'Найден возможный кандидат. ') +
+                'Название: ' + (found.title?.[0] || 'не указано') +
+                '; год: ' + (found.published?.['date-parts']?.[0]?.[0] || found.issued?.['date-parts']?.[0]?.[0] || '—') + '. ';
+              if (typeof found.URL === 'string' && /^https:\/\//.test(found.URL)) {
+                const a = document.createElement('a'); a.href = found.URL; a.rel = 'noopener noreferrer';
+                a.target = '_blank'; a.textContent = 'Открыть карточку DOI'; row.append(a);
+              }
+            }
+          }
+        } catch (error) {
+          row.textContent += 'Не удалось обратиться к Crossref (' + error.message + '). Это не является признаком фальсификации.';
+        }
+        crossrefOutput.append(row);
+        checked++;
+        if (checked < entries.length) await new Promise(resolve => setTimeout(resolve, 1100));
+      }
+      crossref.disabled = false;
+      status.textContent = 'Сверка Crossref завершена. Результаты носят справочный характер.';
     });
     manual.addEventListener('click', async () => {
       const selected = chosen();
