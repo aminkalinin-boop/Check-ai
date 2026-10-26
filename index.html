@@ -125,7 +125,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
   <div id="results" hidden>
     <div class="actions">
       <button id="export" class="primary">Скачать заключение .docx</button>
-      <button id="annot">Скачать документ с подсветкой</button>
+      <button id="annot">Скачать документ: проблемы и действия</button>
       <button id="again">Проверить другой файл</button>
       <span id="saveMsg" role="status"></span>
     </div>
@@ -1113,6 +1113,9 @@ function finalize(res) {
   } else if (medium.length || weak.length >= 3) {
     verdict = 'Выявлены отдельные слабые признаки; прямых признаков не обнаружено';
     conf = 'низкая';
+  } else if (res.stats.shortTextProfile) {
+    verdict = 'Для краткого текста нет достаточной основы для вывода о машинном авторстве; прямые технические признаки не обнаружены';
+    conf = 'не определена';
   } else {
     verdict = 'Признаков применения генеративного ИИ не выявлено';
     conf = '—';
@@ -1497,7 +1500,11 @@ function stylometry(res) {
   const text = body.map(p => p.text).join('\n');
   const W = (text.toLowerCase().replace(/ё/g, 'е').match(/\p{L}+(?:-\p{L}+)*/gu) || []);
   const n = W.length;
-  if (n < 600) { res.stats.stylometry = null; return; }
+  if (n < 600) {
+    res.stats.stylometry = null; // no calibrated long-form score on short papers
+    shortTextAudit(res, body);  // exploratory, no unsupported AI attribution
+    return;
+  }
   const per = c => 1000 * c / n;
   const rows = [];
   const count = (re) => { re.lastIndex = 0; return (text.match(re) || []).length; };
@@ -2348,6 +2355,115 @@ function recordOfflineAudit(res) {
   return res.stats.offlineEngine;
 }
 
+/* Short academic text profile — honest exploratory diagnostics.
+   Full human/LLM stylometry remains restricted to >=600 words.
+   For shorter samples we expose repeatable, paragraph-based observations,
+   never invent calibrated AI probabilities or new strong signals. */
+'use strict';
+function shortTextAudit(res, body) {
+  const proseWords = body.reduce((n, p) => n + p.words, 0);
+  const table = (res.paras || []).filter(p => p && p.inTable && !p.toc && !p.bib && !p.inBox && p.words > 0);
+  const tableWords = table.reduce((n, p) => n + p.words, 0);
+  // Tables are NOT ignored: if connected prose is too short to analyze,
+  // the descriptive profile examines substantive cell paragraphs separately.
+  const tableDominant = proseWords < 150 && tableWords >= 80;
+  const source = tableDominant ? [...body, ...table].sort((a, b) => a.i - b.i) : body;
+  const words = source.reduce((n, p) => n + p.words, 0);
+  if (words < 150 || words >= 600) return null;
+  const blocks = source.filter(p => p.words >= 12);
+  const content = blocks.map(p => p.text).join(' ');
+  // Narrowly anchored language patterns; this is NOT a machine-specific watermark.
+  const hedges = /(?<!\p{L})(?:неизвестн|отсутству|недостаточн|невозможн|не\s+установлен|не\s+позволя|не\s+подтвержден|не\s+доказан|не\s+представлен|не\s+задан|не\s+раскрыв|нельзя\s+определить)\p{L}*(?!\p{L})/giu;
+  const method = /(?<!\p{L})(?:метод(?:ик|ическ)?|исследовательск|расч[её]т|сопоставлени|показател|интерпретаци|выборк|инвестиц|анализ)\p{L}*(?!\p{L})/giu;
+  const quantified = /(?<!\d)\d+(?:[.,]\d+)?\s*(?:%|процент|млн|тыс|дн[яей]|года?|лет)(?!\p{L})/giu;
+  const wordTokens = (t) => (t.toLowerCase().match(/\p{L}{5,}/gu) || []);
+  const paraProfiles = blocks.map(p => {
+    const words = wordTokens(p.text);
+    const repeated = words.filter(w => /(?:анализ|данн|результ|показател|инвестиц|исследован)/iu.test(w));
+    const methodMatches = (p.text.match(method) || []).length;
+    const constraints = (p.text.match(hedges) || []).length;
+    const numbers = (p.text.match(quantified) || []).length;
+    return { p, methodMatches, constraints, numbers, repeated: repeated.length };
+  });
+  const count = (re) => (content.match(re) || []).length;
+  const totalHedges = count(hedges), totalMethod = count(method), totalNumbers = count(quantified);
+  // Distinct sequences are reported; avoid treating a known academic template as authorship.
+  const limitedParas = paraProfiles.filter(x => x.constraints > 0).length;
+  const methodParas = paraProfiles.filter(x => x.methodMatches >= 2).length;
+  const shortMarkers = { words, proseWords, tableWords, tableDominant, paragraphs: blocks.length, methodologicalParagraphs: methodParas,
+    caveatParagraphs: limitedParas, caveatPhrases: totalHedges,
+    quantitativePhrases: totalNumbers, methodTerms: totalMethod,
+    minForFullStylometry: 600,
+    diagnosticClass: 'descriptive-only' };
+  res.stats.shortTextProfile = shortMarkers;
+
+  // Each finding describes exactly why it appeared. For short academic
+  // texts, aggressive weighting of these commonplace patterns is unsound.
+  if (blocks.length >= 3 && limitedParas >= 3 && methodParas >= 2) {
+    addFinding(res, {
+      id: 'short:argument', group: 'style', level: 'info', value: limitedParas,
+      title: 'Краткий академический текст: повторяющаяся структура обоснования и ограничений',
+      detail: 'В ' + limitedParas + ' из ' + blocks.length + ' абзацев присутствуют оговорки о пределах вывода; ' +
+        methodParas + ' абзацев содержат несколько методических терминов. ' +
+        'Упоминаний условий/ограничений: ' + totalHedges + '. ' + (tableDominant ? 'Основной материал размещён в ячейках таблицы; метрики к нему неприменимы как к связной прозе.' : ''),
+      note: 'Композиция «метод → показатели → ограничения» встречается и в самостоятельно написанных статьях. ' +
+        'Этот показатель пригоден для сравнения контролируемых текстов, но сам по себе не доказывает ИИ.',
+      examples: paraProfiles.filter(x => x.constraints > 0).slice(0, 4)
+        .map(x => ({ para: x.p.i, text: x.p.text.slice(0, 160) }))
+    });
+  }
+  // Show representative, LOCAL, descriptive review targets even when the
+  // document has no punitive AI flags. This is crucial for known-origin field
+  // trials and for table-heavy documents; it never changes authorship scores.
+  paraProfiles.filter(x => (x.constraints >= 1 && x.methodMatches >= 1) || x.methodMatches >= 3).slice(0, 8)
+      .forEach(x => x.p.flags.push({
+        type: 'short', key: 'argument', level: 'info',
+        label: 'Академические оговорки и методические формулы (справочно)',
+        observation: 'В ' + (x.p.inTable ? 'ячейке таблицы' : 'абзаце') + ' найдено ' + x.constraints +
+          ' выражений, ограничивающих вывод, и ' + x.methodMatches + ' методических выражений. Примеры: «' +
+          (x.p.text.match(hedges) || []).slice(0, 2).join('», «') + '».',
+        action: x.p.inTable
+          ? 'Сопоставьте утверждения этой ячейки с заголовком столбца и исходными расчётными таблицами; укажите период, единицы измерения и границы допустимого вывода.'
+          : x.numbers > 0
+            ? 'Для каждого числового утверждения этого абзаца укажите исходную таблицу, период, знаменатель процента и способ расчёта; проверьте, не объявлена ли корреляция причинностью.'
+            : 'Привяжите каждую оговорку к конкретной ненаблюдаемой величине или методическому ограничению; уберите дубли только после проверки логики, не удаляя научно обоснованные ограничения.'
+      }));
+  return shortMarkers;
+}
+
+/* Independent per-paragraph editorial guidance. These are instructions for
+   verifying the scientific content, NOT recipes to spoof vendor detectors. */
+'use strict';
+function annotationAdvice(flag, para) {
+  const label = String(flag.label || 'Признак требует проверки');
+  const observed = flag.observation || label;
+  const key = String(flag.key || '').toLowerCase();
+  const type = String(flag.type || '').toLowerCase();
+  const rules = [
+    [/^(style|rstyle)$/, 'Проверьте происхождение форматирования: сравните стиль абзаца со стилями исходного файла. Если оформление случайно перенесено из веб-интерфейса, примените стиль документа, не меняя содержание.'],
+    [/^(md|emoji|phrase)$/, 'Определите, относится ли обнаруженный текст к содержанию исследования или к служебной реплике/разметке. Удаляйте только посторонние элементы; утверждения сверяйте с первоисточниками.'],
+    [/^(char|unicode)$/, 'Проверьте обнаруженную кодовую точку в указанном слове и её назначение. Исправьте случайные скрытые вставки в рабочей копии, сохранив значимые символы формул и единиц измерения.'],
+    [/^(stylo|short)$/, 'Для каждого обобщения укажите конкретный исследовательский объект, показатель, период и подтверждающий источник. Проверьте причинный переход и оправданность повторных оговорок; корректные научные ограничения сохраните.'],
+    [/^(content|lang)$/, 'Сверьте термин с определением в работе и научным источником, а количественное либо категоричное утверждение — с исходной таблицей и расчётом. Уточните область применимости вывода.'],
+    [/^(rep|comp)$/, 'Сравните отмеченный фрагмент с указанными соседними абзацами. Устраните смысловой дубль, если он не несёт самостоятельного аргумента; сохраните значимые данные и ссылки.'],
+    [/^(src)$/, 'Откройте названный первоисточник, проверьте автора, год, страницу и соответствие тезису. Исправьте неверный адрес или номер; при недоступности источника отметьте необходимость ручной проверки.']
+  ];
+  let action = flag.action || null;
+  if (!action) {
+    const match = rules.find(([pattern]) => pattern.test(type));
+    action = match ? match[1] : (key.includes('bib') || key.includes('cite')
+      ? 'Сверьте автора, год, библиографическую запись, цитату и номер страницы по самому источнику. Недоступная ссылка не равна вымышленной.'
+      : 'Проверьте отмеченное утверждение по первичному материалу и его связи с соседними абзацами. Запишите исходный фрагмент, произведённую редакционную правку и её научное обоснование.');
+  }
+  return {
+    issue: observed,
+    action,
+    observation: para && typeof para.text === 'string'
+      ? para.text.trim().slice(0, 150) : '',
+    disclaimer: 'Замечание описывает наблюдаемый признак, а не доказательство ИИ-авторства; цель — проверяемая научная редактура.'
+  };
+}
+
 /* ===================================================================
    Формирование экспертного заключения в формате DOCX (OOXML вручную)
    =================================================================== */
@@ -2481,6 +2597,7 @@ async function buildReportDocx(res) {
   if (usedWeb.some(f => /Angular|Tailwind/.test(f.style.source))) bounds.push('Классы Angular и Tailwind являются маркерами веб-фреймворков, а не уникальными «водяными знаками» генеративной модели; их доказательственное значение возрастает только в совокупности с другими признаками.');
   bounds.push('Не проверялись статистические водяные знаки разработчиков моделей (Anthropic Claude, Google SynthID и др.): их обнаружение возможно только инструментами этих компаний. Заключение сформировано автоматически и подлежит оценке специалистом.');
   bounds.push('Уровень уверенности в настоящем заключении — качественная экспертная оценка совокупности признаков, а не откалиброванная вероятность авторства. Доверительный интервал и статистическая значимость для факта авторства не рассчитывались. Результат не должен использоваться как единственное основание для дисциплинарного решения.');
+  if (s.shortTextProfile) bounds.push('Краткий связный текст: полноценный языковой классификатор не применён; описательная структура и словарь не доказывают происхождение материала.');
   if (s.provenance && s.provenance.predominantlyEnglish) bounds.push('Значительная часть связного текста написана по-английски. Языковая предсказуемость и простота формулировок зависят от владения языком и научного жанра. Калибровка стилометрии на таком материале не выполнялась.');
   out.push(box('Границы вывода', bounds, 'FFF6E5'));
 
@@ -2604,6 +2721,23 @@ async function buildReportDocx(res) {
     [byId('styloA'), byId('styloB')].filter(Boolean).forEach(f => finding(f, 4));
   }
 
+  if (s.shortTextProfile) {
+    const st = s.shortTextProfile;
+    out.push(H2('4.2а. Краткий текст: описательные показатели без калибровки ИИ-авторства'));
+    out.push(P('Для коротких материалов до 600 слов обычная стилометрическая модель не применяется: слишком высока чувствительность к отдельным фразам и теме. Ниже приведены воспроизводимые наблюдения о композиции, не вероятность авторства.'));
+    out.push(table([
+      ['Показатель', 'Значение'],
+      ['Связных слов', String(st.words)],
+      ['Содержательных абзацев', String(st.paragraphs)],
+      ['Абзацев с методологическими терминами', String(st.methodologicalParagraphs)],
+      ['Абзацев с оговорками', String(st.caveatParagraphs)],
+      ['Фраз, ограничивающих интерпретацию', String(st.caveatPhrases)],
+      ['Числовых выражений', String(st.quantitativePhrases)]
+    ], [6400, 2955], { header: true }));
+    const sf = byId('short:argument');
+    if (sf) finding(sf, 4);
+  }
+
   const sub = [['4.3. Ошибочные и незавершённые перекрёстные ссылки', ['fields:ref', 'comp:fielderr', 'xref']],
     ['4.4. Предметно-чужеродные фрагменты', ['alien']],
     ['4.5. Шаблонное воспроизведение числовых структур и дословные повторы', ['numdup', 'rep']],
@@ -2717,7 +2851,7 @@ async function buildReportDocx(res) {
 'use strict';
 
 const RPR_AFTER_SHD = ['fitText', 'vertAlign', 'rtl', 'cs', 'em', 'lang', 'eastAsianLayout', 'specVanish', 'oMath'];
-const FILL = { strong: 'F9C9C3', medium: 'FCE3B0', weak: 'D5E6F7' };
+const FILL = { strong: 'F9C9C3', medium: 'FCE3B0', weak: 'D5E6F7', info: 'E8EDF4' };
 const LVL_ORDER = { strong: 3, medium: 2, weak: 1, info: 0 };
 
 function shadeRun(doc, r, fill) {
@@ -2788,21 +2922,36 @@ async function buildAnnotatedDocx(res) {
     'Проверка на признаки ИИ: ' + v.text,
     v.mainSource ? `Вероятный источник: ${v.mainSource}; разметка веб-интерфейса в ${fmtPct(s.markedShare)} связного текста.` : 'Разметки веб-интерфейсов нейросетей не найдено.',
     `Признаков: сильных ${s.counts.strong}, средних ${s.counts.medium}, слабых ${s.counts.weak}.`,
-    'Подсветка: розовая — сильный признак, жёлтая — средний, голубая — слабый. Комментарий у абзаца перечисляет найденное.',
+    'Цвета: розовый — сильный признак, жёлтый — средний, голубой — слабый, серо-голубой — справочный показатель краткого текста.',
+    'У каждого выделенного абзаца: «Проблема», наблюдение и «Действие по исправлению». Это научная редактура, а не гарантия изменения результатов другого детектора.',
+    'Технические метаданные о программной сборке DOCX не доказывают генерацию текста. Сведения о происхождении научного содержания требуют самостоятельного подтверждения.',
     'Это копия для анализа; исходный файл не изменён.',
   ]);
 
   res.paras.forEach((para, i) => {
-    const flags = para.flags.filter(f => f.level !== 'info');
+    const flags = para.flags.filter(f => f.level !== 'info' || f.type === 'short');
     if (!flags.length || !all[i]) return;
-    const top = flags.reduce((m, f) => LVL_ORDER[f.level] > LVL_ORDER[m] ? f.level : m, 'weak');
+    const top = flags.reduce((m, f) => LVL_ORDER[f.level] > LVL_ORDER[m] ? f.level : m, 'info');
     const runs = ownRuns(all[i]);
     if (!runs.length) return;
     runs.forEach(r => shadeRun(doc, r, FILL[top]));
     marked++;
     if (!para.inBox) {
       const uniq = [...new Map(flags.map(f => [f.label, f])).values()].sort((a, b) => LVL_ORDER[b.level] - LVL_ORDER[a.level]);
-      addComment(all[i], [`Абзац №${i + 1}: признаков ${uniq.length}`, ...uniq.map(f => `• [${LEVELS[f.level]}] ${f.label}`)]);
+      const tasks = uniq.slice(0, 8).flatMap((f, k) => {
+        const g = annotationAdvice(f, para);
+        return [
+          'Проблема ' + (k + 1) + ' [' + (LEVELS[f.level] || 'справочно') + ']: ' + g.issue,
+          'Действие по исправлению ' + (k + 1) + ': ' + g.action
+        ];
+      });
+      if (uniq.length > 8) tasks.push('Дополнительных признаков: ' + (uniq.length - 8) + '. Проверьте их в основном заключении.');
+      addComment(all[i], [
+        'Абзац №' + (i + 1) + ': научная редакторская проверка',
+        'Начало: «' + para.text.trim().slice(0, 125) + '»',
+        ...tasks,
+        'Ограничение: замечание не устанавливает авторство и не гарантирует изменение оценки внешнего детектора.'
+      ]);
     }
   });
 
@@ -2944,7 +3093,15 @@ function render(r) {
   $('#loc').innerHTML = L.length ? `<p class="muted small">Где в документе сохранилась разметка веб-интерфейсов: таблицы и разделы, страницы, текст внутри разметки.</p><table><thead><tr><th>Место</th><th>Стр.</th><th class="num">Слов</th><th>Текст в веб-разметке</th></tr></thead><tbody>${L.map(l => `<tr><td>${esc(l.where)}</td><td class="num">${esc(l.pages.replace('с. ', ''))}</td><td class="num">${l.words}</td><td class="small">${esc(l.sample.slice(0, 220))}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Веб-разметка к тексту не применена.</p>';
   // стилометрия
   const S = r.stats.stylometry;
-  $('#stylo').innerHTML = S ? `<p class="muted small">Связный текст: ${fmtNum(S.words)} слов. Группа А (лексика LLM): превышено ${S.aHit} из ${S.aTotal}. Группа Б (шаблонность, неспецифично): ${S.bHit} из ${S.bTotal}. Значения — на 1000 слов, кроме MATTR и процентов.</p><table><thead><tr><th>Гр.</th><th>Показатель</th><th class="num">Значение</th><th class="num">Ориентир</th><th>Превышение</th></tr></thead><tbody>${S.rows.map(x => `<tr><td>${x.group === 'A' ? 'А' : 'Б'}</td><td>${esc(x.label)}</td><td class="num">${x.value.toFixed(2)}</td><td class="num">${x.dir} ${x.thr}</td><td>${x.exceeded ? `<span class="badge ${x.group === 'A' ? 'b-medium' : 'b-weak'}">×${x.ratio.toFixed(1)}</span>` : '<span class="muted">нет</span>'}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Текста недостаточно для стилометрии (нужно от 600 слов связного текста).</p>';
+  $('#stylo').innerHTML = S ? `<p class="muted small">Связный текст: ${fmtNum(S.words)} слов. Группа А (лексика LLM): превышено ${S.aHit} из ${S.aTotal}. Группа Б (шаблонность, неспецифично): ${S.bHit} из ${S.bTotal}. Значения — на 1000 слов, кроме MATTR и процентов.</p><table><thead><tr><th>Гр.</th><th>Показатель</th><th class="num">Значение</th><th class="num">Ориентир</th><th>Превышение</th></tr></thead><tbody>${S.rows.map(x => `<tr><td>${x.group === 'A' ? 'А' : 'Б'}</td><td>${esc(x.label)}</td><td class="num">${x.value.toFixed(2)}</td><td class="num">${x.dir} ${x.thr}</td><td>${x.exceeded ? `<span class="badge ${x.group === 'A' ? 'b-medium' : 'b-weak'}">×${x.ratio.toFixed(1)}</span>` : '<span class="muted">нет</span>'}</td></tr>`).join('')}</tbody></table>` : (r.stats.shortTextProfile ? '<h3>Профиль краткого академического текста</h3><p class="muted small">Полноценная стилометрическая калибровка применяется к текстам от 600 слов. Ниже — только описательная диагностика; по ней нельзя установить автора.</p><table><tbody>' + [
+       ['Слов', r.stats.shortTextProfile.words],
+       ['Содержательных абзацев', r.stats.shortTextProfile.paragraphs],
+       ['Абзацев с методологическими формулировками', r.stats.shortTextProfile.methodologicalParagraphs],
+       ['Абзацев с ограничениями интерпретации', r.stats.shortTextProfile.caveatParagraphs],
+       ['Фраз-оговорок', r.stats.shortTextProfile.caveatPhrases],
+       ['Количественных утверждений', r.stats.shortTextProfile.quantitativePhrases]
+     ].map(pair => '<tr><td>' + esc(pair[0]) + '</td><td>' + esc(String(pair[1])) + '</td></tr>').join('') +
+     '</tbody></table>' : '<p class="muted">Для стилометрии требуется минимум 150 слов связного текста (полная версия — от 600).</p>');
   // разделы
   const secs = r.sections.filter(x => x.words >= 30);
   $('#sections').innerHTML = secs.length ? `<table><thead><tr><th>Раздел</th><th class="num">Слов</th><th>Доля с разметкой веб-интерфейса</th></tr></thead><tbody>${secs.map(x => { const p = pct(x.marked, x.words); return `<tr><td>${esc(x.title)}</td><td class="num">${fmtNum(x.words)}</td><td><div class="bar"><span style="width:${p.toFixed(1)}%"></span></div><span class="num">${fmtPct(p)}</span></td></tr>`; }).join('')}</tbody></table>` : '<p class="muted">Разделы не выделены.</p>';
@@ -3041,10 +3198,10 @@ function initApp() {
     const btn = $('#annot'); btn.disabled = true; btn.textContent = 'Формирование…';
     try {
       const { blob } = await buildAnnotatedDocx(RES);
-      const st = await saveFile(blob, RES.file.name.replace(/\.[^.]+$/, '') + '_подсветка_ИИ.docx');
+      const st = await saveFile(blob, RES.file.name.replace(/\.[^.]+$/, '') + '_проблемы_и_действия.docx');
       $('#saveMsg').textContent = st === 'declined' ? 'Сохранение отменено.' : 'Документ с подсветкой сохранён.';
     } catch (e) { $('#saveMsg').textContent = 'Не удалось сформировать документ: ' + e.message; console.error(e); }
-    finally { btn.disabled = false; btn.textContent = 'Скачать документ с подсветкой'; }
+    finally { btn.disabled = false; btn.textContent = 'Скачать документ: проблемы и действия'; }
   });
   $('#again').addEventListener('click', () => { $('#results').hidden = true; inp.value = ''; window.scrollTo({ top: 0, behavior: 'smooth' }); });
 }

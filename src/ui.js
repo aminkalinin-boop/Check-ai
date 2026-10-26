@@ -84,7 +84,15 @@ function render(r) {
   $('#loc').innerHTML = L.length ? `<p class="muted small">Где в документе сохранилась разметка веб-интерфейсов: таблицы и разделы, страницы, текст внутри разметки.</p><table><thead><tr><th>Место</th><th>Стр.</th><th class="num">Слов</th><th>Текст в веб-разметке</th></tr></thead><tbody>${L.map(l => `<tr><td>${esc(l.where)}</td><td class="num">${esc(l.pages.replace('с. ', ''))}</td><td class="num">${l.words}</td><td class="small">${esc(l.sample.slice(0, 220))}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Веб-разметка к тексту не применена.</p>';
   // стилометрия
   const S = r.stats.stylometry;
-  $('#stylo').innerHTML = S ? `<p class="muted small">Связный текст: ${fmtNum(S.words)} слов. Группа А (лексика LLM): превышено ${S.aHit} из ${S.aTotal}. Группа Б (шаблонность, неспецифично): ${S.bHit} из ${S.bTotal}. Значения — на 1000 слов, кроме MATTR и процентов.</p><table><thead><tr><th>Гр.</th><th>Показатель</th><th class="num">Значение</th><th class="num">Ориентир</th><th>Превышение</th></tr></thead><tbody>${S.rows.map(x => `<tr><td>${x.group === 'A' ? 'А' : 'Б'}</td><td>${esc(x.label)}</td><td class="num">${x.value.toFixed(2)}</td><td class="num">${x.dir} ${x.thr}</td><td>${x.exceeded ? `<span class="badge ${x.group === 'A' ? 'b-medium' : 'b-weak'}">×${x.ratio.toFixed(1)}</span>` : '<span class="muted">нет</span>'}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Текста недостаточно для стилометрии (нужно от 600 слов связного текста).</p>';
+  $('#stylo').innerHTML = S ? `<p class="muted small">Связный текст: ${fmtNum(S.words)} слов. Группа А (лексика LLM): превышено ${S.aHit} из ${S.aTotal}. Группа Б (шаблонность, неспецифично): ${S.bHit} из ${S.bTotal}. Значения — на 1000 слов, кроме MATTR и процентов.</p><table><thead><tr><th>Гр.</th><th>Показатель</th><th class="num">Значение</th><th class="num">Ориентир</th><th>Превышение</th></tr></thead><tbody>${S.rows.map(x => `<tr><td>${x.group === 'A' ? 'А' : 'Б'}</td><td>${esc(x.label)}</td><td class="num">${x.value.toFixed(2)}</td><td class="num">${x.dir} ${x.thr}</td><td>${x.exceeded ? `<span class="badge ${x.group === 'A' ? 'b-medium' : 'b-weak'}">×${x.ratio.toFixed(1)}</span>` : '<span class="muted">нет</span>'}</td></tr>`).join('')}</tbody></table>` : (r.stats.shortTextProfile ? '<h3>Профиль краткого академического текста</h3><p class="muted small">Полноценная стилометрическая калибровка применяется к текстам от 600 слов. Ниже — только описательная диагностика; по ней нельзя установить автора.</p><table><tbody>' + [
+       ['Слов', r.stats.shortTextProfile.words],
+       ['Содержательных абзацев', r.stats.shortTextProfile.paragraphs],
+       ['Абзацев с методологическими формулировками', r.stats.shortTextProfile.methodologicalParagraphs],
+       ['Абзацев с ограничениями интерпретации', r.stats.shortTextProfile.caveatParagraphs],
+       ['Фраз-оговорок', r.stats.shortTextProfile.caveatPhrases],
+       ['Количественных утверждений', r.stats.shortTextProfile.quantitativePhrases]
+     ].map(pair => '<tr><td>' + esc(pair[0]) + '</td><td>' + esc(String(pair[1])) + '</td></tr>').join('') +
+     '</tbody></table>' : '<p class="muted">Для стилометрии требуется минимум 150 слов связного текста (полная версия — от 600).</p>');
   // разделы
   const secs = r.sections.filter(x => x.words >= 30);
   $('#sections').innerHTML = secs.length ? `<table><thead><tr><th>Раздел</th><th class="num">Слов</th><th>Доля с разметкой веб-интерфейса</th></tr></thead><tbody>${secs.map(x => { const p = pct(x.marked, x.words); return `<tr><td>${esc(x.title)}</td><td class="num">${fmtNum(x.words)}</td><td><div class="bar"><span style="width:${p.toFixed(1)}%"></span></div><span class="num">${fmtPct(p)}</span></td></tr>`; }).join('')}</tbody></table>` : '<p class="muted">Разделы не выделены.</p>';
@@ -181,10 +189,10 @@ function initApp() {
     const btn = $('#annot'); btn.disabled = true; btn.textContent = 'Формирование…';
     try {
       const { blob } = await buildAnnotatedDocx(RES);
-      const st = await saveFile(blob, RES.file.name.replace(/\.[^.]+$/, '') + '_подсветка_ИИ.docx');
+      const st = await saveFile(blob, RES.file.name.replace(/\.[^.]+$/, '') + '_проблемы_и_действия.docx');
       $('#saveMsg').textContent = st === 'declined' ? 'Сохранение отменено.' : 'Документ с подсветкой сохранён.';
     } catch (e) { $('#saveMsg').textContent = 'Не удалось сформировать документ: ' + e.message; console.error(e); }
-    finally { btn.disabled = false; btn.textContent = 'Скачать документ с подсветкой'; }
+    finally { btn.disabled = false; btn.textContent = 'Скачать документ: проблемы и действия'; }
   });
   $('#again').addEventListener('click', () => { $('#results').hidden = true; inp.value = ''; window.scrollTo({ top: 0, behavior: 'smooth' }); });
 }
