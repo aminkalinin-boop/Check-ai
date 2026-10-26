@@ -110,6 +110,22 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
     <p>Анализ DOCX: разметка веб-интерфейсов нейросетей, скрытые символы, метаданные, остатки ответов чат-ботов, повторы, сноски и ссылки.</p>
   </header>
 
+  <div class="card" id="reference-controls" style="margin-bottom:12px">
+    <label style="display:flex;align-items:flex-start;gap:9px;font-weight:600;cursor:pointer">
+      <input type="checkbox" id="reference-enabled" style="margin-top:4px">
+      <span>Проверить заранее выделенные фрагменты из отчёта «Антиплагиат»</span>
+    </label>
+    <div class="muted small" style="margin:6px 0 10px">Предварительно выделите фрагменты цветом в исходном DOCX. Check-AI независимо проверит весь документ, затем отдельно разберёт ручную разметку по абзацам: проблема, действие, контекст и совпадение с собственными признаками.</div>
+    <label for="reference-color" class="muted small">Цвет выделения: </label>
+    <select id="reference-color" aria-label="Цвет ручной подсветки">
+      <option value="purple">Фиолетовый / пурпурный</option>
+      <option value="yellow">Жёлтый</option>
+      <option value="cyan">Голубой</option>
+      <option value="green">Зелёный</option>
+      <option value="all">Любой цвет подсветки</option>
+    </select>
+    <div class="muted small" style="margin-top:7px">Учитываются Word-маркер и заливка фрагмента; PDF и скриншоты нужно предварительно перенести в DOCX. Выделение не считается доказательством ИИ.</div>
+  </div>
   <div id="drop" class="drop" tabindex="0" role="button" aria-label="Выбрать файл">
     <b>Нажмите, чтобы выбрать файл .docx</b>
     <div class="muted">На компьютере файл можно перетащить сюда</div>
@@ -146,6 +162,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
       <button class="tab" data-tab="sections">По разделам</button>
       <button class="tab" data-tab="styles">Стили</button>
       <button class="tab" data-tab="meta">Метаданные</button>
+      <button class="tab" data-tab="reference" id="reference-tab" hidden>Разметка Антиплагиата</button>
     </div>
     <div class="pane" id="pane-findings"><div id="findings"></div></div>
     <div class="pane" id="pane-paras" hidden>
@@ -156,6 +173,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
     <div class="pane" id="pane-loc" hidden><div id="loc"></div></div>
     <div class="pane" id="pane-sections" hidden><div id="sections"></div></div>
     <div class="pane" id="pane-styles" hidden><div id="styles"></div></div>
+    <div class="pane" id="pane-reference" hidden><div id="reference-summary"></div><div id="reference-items"></div></div>
     <div class="pane" id="pane-meta" hidden><div id="meta"></div></div>
   </div>
 
