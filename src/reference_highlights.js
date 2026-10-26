@@ -69,41 +69,27 @@ function referenceRuns(paragraph) {
   return result;
 }
 function referenceAdvice(p, snippet, ownFlags) {
-  const sample = snippet.replace(/\s+/g, ' ').trim();
-  if (p.toc || p.heading || /^(?:ВВЕДЕНИЕ|ЗАКЛЮЧЕНИЕ|ГЛАВА|СПИСОК ЛИТЕРАТУРЫ)$/i.test(sample)) {
-    return { category: 'Служебная структура',
-      problem: 'Отмечен заголовок или элемент оглавления. Сам по себе он не содержит достаточного материала для определения происхождения текста.',
-      action: 'Проверьте разметку и границы внешнего фрагмента по оригинальному отчёту. Заголовок сохраняйте; соседний авторский текст рассматривайте отдельно.' };
-  }
-  if (p.bib) return { category: 'Библиографическая запись',
-    problem: 'Выделена стандартизированная библиографическая запись, а не самостоятельное научное рассуждение.',
-    action: 'Проверьте по первоисточнику автора, заглавие, год, страницы и DOI; не квалифицируйте запись как ИИ по единообразию оформления.' };
-  if (/10\.\d{4,9}\//i.test(sample) || /\[\s*\d+(?:,\s*\d+)*\s*\]/.test(sample))
-    return { category: 'Ссылочное утверждение',
-      problem: 'Отмеченный фрагмент содержит библиографическую отсылку, достоверность которой не устанавливается по самому тексту.',
-      action: 'Найдите первоисточник и сверьте формулировку тезиса, точную страницу и корректность ссылки. Несуществование источника нужно подтверждать отдельно.' };
-  if (p.inTable) return { category: 'Табличный текст',
-    problem: 'Отмечен текст в таблице; без заголовков граф и исходных расчётов его интерпретация ограничена.',
-    action: 'Сверьте строку с заголовками столбцов, единицами измерения, периодом и исходными таблицами расчётов; проверьте соответствие выводу в основном тексте.' };
-  if (/\d+(?:[.,]\d+)?\s*(?:%|млн|тыс|год|лет|дн|ед\.|руб)/i.test(sample))
-    return { category: 'Числовое обобщение',
-      problem: 'Отмечено количественное утверждение. Без данных нельзя проверить вычисление и переход от наблюдения к объяснению.',
-      action: 'Проверьте числитель и знаменатель, год, размер выборки, единицы и исходную таблицу; отделите корреляцию от причинного утверждения.' };
-  if (/(?:таким образом|следовательно|в целом|это свидетельствует|можно сделать вывод)/iu.test(sample))
-    return { category: 'Заключительная конструкция',
-      problem: 'Выделен переход от наблюдений к обобщению. Академическая итоговая формула неспецифична для машинного авторства.',
-      action: 'Найдите конкретные результаты предыдущих абзацев, проверьте, что заключение вытекает из них и не повторяет их без нового содержания.' };
-  if (/(?:ключев\p{L}*|комплексн\p{L}*|значим\p{L}*|эффективн\p{L}*|обеспечива\p{L}*)/iu.test(sample))
-    return { category: 'Оценочная научная формулировка',
-      problem: 'Отмечено оценочное или обобщающее выражение, возможное и в самостоятельно написанном научном тексте.',
-      action: 'Определите конкретный измеряемый показатель или проверяемое основание оценки. Укажите источник и границы интерпретации, если это требуется.' };
-  if (ownFlags.length) return { category: 'Совпадение с локальными признаками',
-    problem: 'Отмеченный внешний фрагмент находится в абзаце, где Check-AI независимо обнаружил признаки. Области могут не совпадать полностью.',
-    action: 'Сравните точное выделение с локализованными признаками Check-AI и проверьте, относятся ли они к тем же словам. Вывод о происхождении не делается автоматически.' };
-  return { category: 'Внешняя отметка без локального объяснения',
-    problem: 'Фрагмент выделен во внешнем отчёте, но Check-AI не нашёл самостоятельного локального признака в данном абзаце.',
-    action: 'Сопоставьте выделение с соседними абзацами, исследовательским вопросом, первичными материалами и научным жанром. Отсутствие локального признака фиксируйте как расхождение детекторов.' };
+  // Analyze exactly the marked phrase for explicit constructions and its
+  // containing paragraph for rhythm; report their scopes separately.
+  const d=scientificParagraphDiagnosis(p.text,snippet,p);
+  const primary=bestScientificSignal(d);
+  const usable=d.signals.filter(x=>x.id!=='not-identified');
+  const detail=usable.slice(0,4).map(x=>({
+    marker:x.title,evidence:x.evidence,reason:x.interpretation,action:x.action,scope:x.scope
+  }));
+  const category=primary?.id==='inference'?'Заключительная конструкция':
+    (primary?.title||'Маркер не установлен');
+  const hasBodyEvidence=usable.some(x=>!['quantitative','table-context','structural','bibliography'].includes(x.id));
+  return {
+    category,
+    problem:primary?.evidence||'Нет измеримого локального маркера.',
+    reason:primary?.interpretation||'Внутренние признаки независимы от внешней подсветки.',
+    action:primary?.action||'Сверьте научные утверждения с источниками и контекстом.',
+    diagnostic: { signals:detail,metrics:d.metric,hasLocalLinguisticEvidence:hasBodyEvidence,
+      specificity: 'Описание измеряемых языковых особенностей, не реконструкция закрытого алгоритма Антиплагиата' }
+  };
 }
+
 function collectReferenceHighlights(res, doc, mode = 'purple') {
   const body = doc.getElementsByTagNameNS(W_NS, 'body')[0] || doc.documentElement;
   const ps = [...body.getElementsByTagNameNS(W_NS, 'p')]
@@ -130,7 +116,8 @@ function collectReferenceHighlights(res, doc, mode = 'purple') {
         contextualBefore: info.text.slice(Math.max(0, group.start - 115), group.start).trim(),
         contextualAfter: info.text.slice(group.end, group.end + 115).trim(),
         wholeParagraphWords: info.words, flags: local.slice(0, 12),
-        category: guidance.category, problem: guidance.problem, action: guidance.action
+        category: guidance.category, problem: guidance.problem, reason: guidance.reason,
+        action: guidance.action, diagnostic: guidance.diagnostic
       });
       hits.add(i);
       totalHighlighted += exact.length;

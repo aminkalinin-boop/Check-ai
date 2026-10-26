@@ -30,7 +30,8 @@ function makeRes(paras) {
   })) };
 }
 function sourceWithMocks() {
-  const script=fs.readFileSync(path.join(__dirname,'..','src','reference_highlights.js'),'utf8');
+  const script=fs.readFileSync(path.join(__dirname,'..','src','linguistic_diagnostics.js'),'utf8') +
+    '\n' + fs.readFileSync(path.join(__dirname,'..','src','reference_highlights.js'),'utf8');
   const ctx={ W_NS:W, MC_NS:MC, childW:(node,name)=>(node?.children||[]).find(x=>x.localName===name&&x.namespaceURI===W)||null,
     wAttr:(node,name)=>node?.attrs?.[name]||null,
     hasAncestor:(node,ns,name,stop)=>{let x=node.parentNode;while(x&&x!==stop){if(x.namespaceURI===ns&&x.localName===name)return true;x=x.parentNode;}return false;}
@@ -91,7 +92,7 @@ test('Manual markup report and DOCX comments are independent extensions',()=>{
   assert.match(analyzer,/collectReferenceHighlights\(res, doc,/);
   assert.match(report,/Приложение В\. Ручные выделения/);
   assert.match(anno,/manualByPara/);
-  assert.match(anno,/Действие по проверке внешнего выделения/);
+  assert.match(anno,/Точное действие/);
   assert.match(anno,/Do not erase colors/);
 });
 

@@ -306,13 +306,21 @@ async function buildReportDocx(res) {
       out.push(H2('Выделение №' + fragment.id + ' — абзац ' + fragment.paragraph +
         (fragment.page ? ', с. ' + fragment.page : '') + ' — ' + fragment.category));
       out.push(P('Раздел: ' + fragment.section + (fragment.inTable ? ' (таблица)' : '')));
-      out.push(P('Точно выделенный текст: ' + fragment.text.slice(0, 3500) +
-        (fragment.text.length > 3500 ? ' [длинный фрагмент сокращён; оригинал остаётся в DOCX]' : '')));
-      if (fragment.contextualBefore || fragment.contextualAfter)
-        out.push(P('Ближайший контекст: ' + fragment.contextualBefore.slice(-150) +
-          ' [ВЫДЕЛЕНИЕ] ' + fragment.contextualAfter.slice(0, 150)));
-      out.push(P('Проблема: ' + fragment.problem));
-      out.push(P('Действие по проверке: ' + fragment.action));
+      out.push(P('Текст выделения не копируется повторно: найдите его по номеру абзаца в исходном DOCX.'));
+      out.push(P('Измеряемое наблюдение: ' + fragment.problem));
+      out.push(P('Объяснение: ' + fragment.reason));
+      out.push(P('Конкретное действие: ' + fragment.action));
+      for (const extra of (fragment.diagnostic?.signals || []).slice(1, 4)) {
+        out.push(P('Дополнительный маркер «' + extra.marker + '»: ' + extra.evidence));
+        out.push(P('Действие: ' + extra.action));
+      }
+      if (fragment.diagnostic?.metrics?.sentenceCount >= 2) {
+        const m = fragment.diagnostic.metrics;
+        out.push(P('Параметры содержащего абзаца: ' + m.words + ' слов; ' +
+          m.sentenceCount + ' предложений; средняя длина ' + m.meanSentenceWords +
+          ' слова; коэффициент вариации длины ' + (m.sentenceLengthCV ?? 'не определён') +
+          '. Это описательная статистика, не вероятность ИИ.'));
+      }
       const local = fragment.flags.filter(x => ['strong','medium','weak'].includes(x.level));
       out.push(P('Независимые признаки Check-AI в пределах абзаца: ' +
         (local.length ? local.map(x => '[' + x.level + '] ' + x.label).join('; ') : 'не установлены. Это расхождение с внешней разметкой, а не доказательство её ошибки.')));
@@ -321,6 +329,36 @@ async function buildReportDocx(res) {
       out.push(P('Из-за объёма отчёта выведены первые 2000 фрагментов; исходные выделения сохранены в DOCX.'));
   }
 
+  // This section appears in BOTH ordinary and manually highlighted modes.
+  // It provides evidence-based editorial actions without duplicating source text.
+  const editorTargets = res.paras.filter(p => p.words > 0 &&
+    p.flags.some(flag => ['strong','medium','weak'].includes(flag.level) || flag.type==='short'));
+  out.push(H1(res.reference ? 'Приложение Г. Диагностические карточки Check-AI' :
+    'Приложение В. Диагностические карточки Check-AI'));
+  out.push(P('Ниже приводятся измеренные наблюдения и действия по проверке для собственных находок программы. Исходный текст абзацев не перепечатывается. Подозрение по языковому шаблону не доказывает ИИ-авторство. Это не декодирование внутреннего алгоритма «Антиплагиата».'));
+  if (!editorTargets.length) out.push(P('Абзацев с локальными маркерами повышенного внимания не установлено.'));
+  for (const p of editorTargets.slice(0,300)) {
+    const flags=[...new Map(p.flags.filter(flag =>
+      ['strong','medium','weak'].includes(flag.level) || flag.type==='short')
+      .map(flag=>[flag.type+':'+flag.key,flag])).values()].slice(0,4);
+    out.push(H2('Абзац №'+(p.i+1)+(p.page?', с. '+p.page:'')+' — '+(p.section||'без раздела')));
+    for (const flag of flags) {
+      const g=annotationAdvice(flag,p);
+      out.push(P('Собственный признак: '+flag.label+' ['+flag.level+']'));
+      out.push(P('Наблюдаемая проблема: '+g.issue));
+      out.push(P('Почему отмечено: '+g.reason));
+      out.push(P('Точное действие по проверке: '+g.action));
+    }
+    const d=scientificParagraphDiagnosis(p.text,'',p);
+    const independent=d.signals.filter(x=>!['not-identified'].includes(x.id)).slice(0,2);
+    for (const marker of independent) {
+      if (flags.some(f=>annotationAdvice(f,p).signalId===marker.id))continue;
+      out.push(P('Языковая диагностика: '+marker.title+'. '+marker.evidence));
+      out.push(P('Проверить: '+marker.action));
+    }
+  }
+  if (editorTargets.length>300) out.push(P('В отчёте первые 300 абзацев; полный список наблюдений доступен в приложении Б и исходном документе.'));
+  
   out.push(para(`Заключение сформировано автоматически программой «Проверка DOCX на признаки ИИ» v${APP_VERSION} ${res.date.toLocaleString('ru-RU')}. Результаты носят вероятностный характер и подлежат оценке специалистом.`, { style: 'Small' }));
 
   const body = out.join('');

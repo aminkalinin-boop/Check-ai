@@ -22,11 +22,20 @@ function annotationAdvice(flag, para) {
       ? 'Сверьте автора, год, библиографическую запись, цитату и номер страницы по самому источнику. Недоступная ссылка не равна вымышленной.'
       : 'Проверьте отмеченное утверждение по первичному материалу и его связи с соседними абзацами. Запишите исходный фрагмент, произведённую редакционную правку и её научное обоснование.');
   }
+  const d = scientificParagraphDiagnosis(para?.text || '', '', para || {});
+  const matching = d.signals.filter(x => x.id !== 'not-identified');
+  const primary = bestScientificSignal(d);
+  // Technical flags remain technical. Linguistic flags can be explained by
+  // local, measured constructions instead of repeating the entire paragraph.
+  const linguistic = ['stylo','short','content','lang','rep','comp'].includes(type);
+  const exact = linguistic && matching.length ? primary : null;
   return {
-    issue: observed,
-    action,
-    observation: para && typeof para.text === 'string'
-      ? para.text.trim().slice(0, 150) : '',
+    issue: exact ? exact.title + '. ' + exact.evidence : observed,
+    action: exact ? exact.action : action,
+    reason: exact ? exact.interpretation : 'Собственное правило Check-AI отметило: «' + label + '». Этого недостаточно для установления авторства.',
+    observation: exact ? exact.evidence : (flag.observation || label),
+    metrics: d.metric,
+    signalId: exact?.id || null,
     disclaimer: 'Замечание описывает наблюдаемый признак, а не доказательство ИИ-авторства; цель — проверяемая научная редактура.'
   };
 }

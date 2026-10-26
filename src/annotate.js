@@ -109,20 +109,25 @@ async function buildAnnotatedDocx(res) {
       const tasks = uniq.slice(0, 8).flatMap((f, k) => {
         const g = annotationAdvice(f, para);
         return [
-          'Проблема ' + (k + 1) + ' [' + (LEVELS[f.level] || 'справочно') + ']: ' + g.issue,
-          'Действие по исправлению ' + (k + 1) + ': ' + g.action
+          'Признак ' + (k + 1) + ' [' + (LEVELS[f.level] || 'справочно') + ']: ' + g.issue,
+          'Обоснование ' + (k + 1) + ': ' + g.reason,
+          'Точное действие ' + (k + 1) + ': ' + g.action
         ];
       });
       if (uniq.length > 8) tasks.push('Дополнительных признаков: ' + (uniq.length - 8) + '. Проверьте их в основном заключении.');
       addComment(all[i], [
         'Абзац №' + (i + 1) + ': научная редакторская проверка',
-        'Начало: «' + para.text.trim().slice(0, 125) + '»',
         ...tasks,
         ...reference.slice(0, 10).flatMap((f, k) => [
-          'Внешнее выделение №' + f.id + ' (' + f.category + '): «' + f.text.slice(0, 380) + '»',
-          'Проблема внешнего выделения ' + (k + 1) + ': ' + f.problem,
-          'Действие по проверке внешнего выделения ' + (k + 1) + ': ' + f.action,
-          'Собственные признаки в этом абзаце: ' +
+          'Внешнее выделение №' + f.id + ' (' + f.category + '). Текст уже выделен в документе и здесь не дублируется.',
+          'Измеримый признак ' + (k + 1) + ': ' + f.problem,
+          'Почему признак требует внимания ' + (k + 1) + ': ' + f.reason,
+          'Точное действие ' + (k + 1) + ': ' + f.action,
+          ...(f.diagnostic?.signals||[]).slice(1,3).flatMap(x=>[
+            'Дополнительный маркер: ' + x.marker + '. ' + x.evidence,
+            'Действие по дополнительному маркеру: ' + x.action
+          ]),
+          'Независимые признаки Check-AI: ' +
             (f.flags.filter(z => ['strong','medium','weak'].includes(z.level)).map(z => z.label).join('; ') || 'не найдены')
         ]),
         ...(reference.length > 10 ? ['Остальные внешние выделения в этом абзаце см. в приложении к заключению.'] : []),

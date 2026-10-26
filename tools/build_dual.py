@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src"
 ORDER = [
     "analyzer.js", "content.js", "stylometry.js", "extra.js",
-    "robustness.js", "academic_audit.js", "discourse_audit.js", "provenance_fairness.js", "offline_engine.js", "short_text_audit.js", "annotation_guidance.js", "reference_highlights.js", "report_docx.js", "report2.js", "annotate.js", "platform.js", "ui.js"
+    "robustness.js", "academic_audit.js", "discourse_audit.js", "provenance_fairness.js", "offline_engine.js", "short_text_audit.js", "annotation_guidance.js", "reference_highlights.js", "linguistic_diagnostics.js", "report_docx.js", "report2.js", "annotate.js", "platform.js", "ui.js"
 ]
 
 
