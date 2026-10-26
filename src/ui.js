@@ -144,6 +144,7 @@ function render(r) {
 function renderReferenceReview(r) {
   const ref = r.reference;
   $('#reference-tab').hidden = !ref;
+  if (!ref && document.querySelector('.tab.active')?.dataset.tab === 'reference') showTab('findings');
   if (!ref) { $('#reference-summary').textContent = ''; $('#reference-items').textContent = ''; return; }
   const flagsCount = ref.fragments.filter(f => f.flags.some(flag => ['strong','medium','weak'].includes(flag.level))).length;
   $('#reference-summary').innerHTML =
