@@ -143,6 +143,14 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
       <button id="export" class="primary">Скачать заключение .docx</button>
       <button id="annot">Скачать документ: проблемы и действия</button>
       <button id="again">Проверить другой файл</button>
+      <label class="muted small" for="knowledge-origin">Происхождение для научного эксперимента</label>
+      <select id="knowledge-origin" aria-label="Подтверждённое происхождение текста для выгрузки числового профиля">
+        <option value="unknown">Не подтверждено</option>
+        <option value="human">Человек (заявлено владельцем)</option>
+        <option value="machine">Нейросеть (известный контрольный текст)</option>
+        <option value="mixed">Смешанная редактура</option>
+      </select>
+      <button id="knowledge-export">Скачать обезличенные показатели .json</button>
       <span id="saveMsg" role="status"></span>
     </div>
     <div id="verdict" class="verdict"></div>
@@ -158,6 +166,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
       <button class="tab active" data-tab="findings">Признаки</button>
       <button class="tab" data-tab="paras">Абзацы</button>
       <button class="tab" data-tab="stylo">Стилометрия</button>
+      <button class="tab" data-tab="knowledge">База признаков</button>
       <button class="tab" data-tab="loc">Локализация</button>
       <button class="tab" data-tab="sections">По разделам</button>
       <button class="tab" data-tab="styles">Стили</button>
@@ -170,6 +179,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
       <div id="paras"></div>
     </div>
     <div class="pane" id="pane-stylo" hidden><div id="stylo"></div></div>
+    <div class="pane" id="pane-knowledge" hidden><div id="knowledge"></div></div>
     <div class="pane" id="pane-loc" hidden><div id="loc"></div></div>
     <div class="pane" id="pane-sections" hidden><div id="sections"></div></div>
     <div class="pane" id="pane-styles" hidden><div id="styles"></div></div>

@@ -129,6 +129,49 @@ function render(r) {
       '<p class="muted small">' + esc(led.limitations) + '</p>');
   }
 
+  // Источники правил и исторический эталон видны в ОБОИХ режимах.
+  const K=s.knowledgeAudit;
+  if(K){
+    const reference=K.historicalReference;
+    const comparisons=reference.status==='computed' ? reference.features.filter(x=>x.status!=='within_p10_p90') : [];
+    const names={'above_p90':'выше P90','below_p10':'ниже P10','within_p10_p90':'между P10 и P90'};
+    const refs=CHECK_AI_MARKER_KB.sources.map(source=>{
+      const address=source.url && /^https:\/\/[^\s"'<>]+$/.test(source.url)?source.url:
+        source.path && /^(?:research|data)\/[A-Za-z0-9_.\/-]+$/.test(source.path) ?
+          'https://github.com/aminkalinin-boop/Check-ai/blob/main/'+source.path:null;
+      return '<li><b>'+esc(source.title)+'</b> — '+esc(source.type)+
+        (source.verifiedPrimary?' (первоисточник проверен)':' (описание/наблюдение; первоисточник не подтверждён)')+
+        (address?' · <a target="_blank" rel="noopener noreferrer" href="'+address+'">Открыть</a>':'')+'</li>';
+    }).join('');
+    $('#knowledge').innerHTML='<h3>Локальная база научной диагностики — '+esc(K.version)+'</h3>'+
+      '<p class="muted small">'+esc(K.validation)+'</p>'+
+      '<div class="kpis">'+[
+        ['Определений признаков',K.definitions,'с источниками и статусами'],
+        ['Научных и пользовательских источников',K.sources,'встроены в HTML'],
+        ['Параграфов проанализировано',K.paragraphsReviewed,'включая таблицы'],
+        ['С найденными связанными правилами',K.paragraphsWithMappedMarkers,'не процент ИИ']
+      ].map(([t,v,d])=>'<div class="kpi"><div class="kpi-t">'+esc(t)+'</div><div class="kpi-n">'+v+
+        '</div><div class="kpi-d">'+esc(d)+'</div></div>').join('')+'</div>'+
+      '<h4>Исторический человеческий эталон: 62 статьи одного экономиста</h4>'+
+      '<p class="muted small">'+esc(reference.description)+'</p>'+
+      (reference.status==='computed'
+        ? '<p>Отклонений от индивидуального диапазона P10–P90: '+comparisons.length+
+          '. Ни одно из них не доказывает участие модели.</p>'+
+          '<table><thead><tr><th>Показатель</th><th>Работа</th><th>P10</th><th>P90</th><th>Положение</th></tr></thead><tbody>'+
+          reference.features.map(f=>'<tr><td>'+esc(f.label)+'</td><td>'+f.observed+'</td><td>'+
+            f.p10+'</td><td>'+f.p90+'</td><td>'+esc(names[f.status])+'</td></tr>').join('')+'</tbody></table>'
+        : '<p class="muted">'+esc(reference.description)+'</p>')+
+      '<h4>Локальные наблюдения, связанные с базой</h4>'+
+      (K.byRule.length?'<table><thead><tr><th>Положение</th><th>Абзацев</th><th>Доказательность</th><th>Редакторская проверка</th></tr></thead><tbody>'+
+        K.byRule.slice(0,40).map(item=>{
+          const m=CHECK_AI_MARKER_KB.entries.find(x=>x.id===item.id);
+          return m?'<tr><td>'+esc(m.title)+'</td><td>'+item.count+'</td><td>'+esc(m.evidence_status)+
+            '</td><td>'+esc(m.action)+'</td></tr>':'';}).join('')+'</tbody></table>':
+        '<p class="muted">Для данного документа подходящих измеренных шаблонов не обнаружено.</p>')+
+      '<h4>Источники</h4><ol>'+refs+'</ol>'+
+      '<p class="muted small">Текстов исторических статей в публичном репозитории нет. Показатели одного автора не представляют всего научного сообщества.</p>';
+  }
+
   // фильтр абзацев
   const types = new Map();
   r.paras.forEach(p => p.flags.forEach(f => { const k = f.label.replace(/«[^»]*»$/, '').replace(/№\d+/, '').replace(/сноске \d+/, 'сноске').trim(); types.set(k, (types.get(k) || 0) + 1); }));
@@ -254,6 +297,18 @@ function initApp() {
       $('#saveMsg').textContent = st === 'declined' ? 'Сохранение отменено.' : 'Документ с подсветкой сохранён.';
     } catch (e) { $('#saveMsg').textContent = 'Не удалось сформировать документ: ' + e.message; console.error(e); }
     finally { btn.disabled = false; btn.textContent = 'Скачать документ: проблемы и действия'; }
+  });
+  $('#knowledge-export').addEventListener('click',async()=>{
+    if(!RES)return;
+    const btn=$('#knowledge-export');
+    btn.disabled=true;
+    try{
+      const profile=exportKnowledgeProfile(RES,$('#knowledge-origin').value);
+      const blob=new Blob([JSON.stringify(profile,null,2)],{type:'application/json;charset=utf-8'});
+      const saved=await saveFile(blob,'CheckAI_обезличенные_показатели.json');
+      $('#saveMsg').textContent=saved==='declined'?'Сохранение отменено.':'Обезличенный профиль сохранён на устройстве. В GitHub он автоматически не отправлялся.';
+    }catch(e){$('#saveMsg').textContent='Не удалось сохранить профиль: '+e.message;}
+    finally{btn.disabled=false;}
   });
   $('#again').addEventListener('click', () => { $('#results').hidden = true; inp.value = ''; window.scrollTo({ top: 0, behavior: 'smooth' }); });
 }

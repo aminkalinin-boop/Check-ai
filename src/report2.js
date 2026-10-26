@@ -359,6 +359,42 @@ async function buildReportDocx(res) {
   }
   if (editorTargets.length>300) out.push(P('В отчёте первые 300 абзацев; полный список наблюдений доступен в приложении Б и исходном документе.'));
   
+  // Evidence-based reference appendix is generated in BOTH site modes.
+  if (res.stats.knowledgeAudit) {
+    const knowledge = res.stats.knowledgeAudit;
+    const compare = knowledge.historicalReference;
+    out.push(H1('Приложение. Проверяемая база знаний и исторический научный эталон'));
+    out.push(P('Версия базы признаков: ' + knowledge.version +
+      '; определений: ' + knowledge.definitions + '; источников: ' + knowledge.sources +
+      '; проверенных первичных научных источников: ' + knowledge.peerReviewedSources + '.'));
+    out.push(P(knowledge.validation));
+    out.push(P('Историческая база: ' + compare.source));
+    out.push(P(compare.description));
+    if (compare.status === 'computed') {
+      const deviations = compare.features.filter(x=>x.status!=='within_p10_p90');
+      out.push(P('Для данной рукописи найдено отклонений от диапазона P10–P90 одного автора: ' +
+        deviations.length + ' (из ' + compare.features.length + ' показателей). ' +
+        'Отклонения не являются вероятностью участия ИИ, не объединяются в искусственный процент.'));
+      if (deviations.length) out.push(table([
+        ['Показатель', 'Работа', 'P10', 'P90', 'Сравнение'],
+        ...deviations.slice(0,20).map(x=>[
+          x.label.slice(0,95),String(x.observed),String(x.p10),String(x.p90),
+          x.status==='above_p90'?'выше P90':'ниже P10'
+        ])
+      ],[4260,1100,1100,1100,1795],{header:true}));
+    }
+    const referenceExamples=knowledge.byRule.slice(0,12);
+    if(referenceExamples.length)out.push(table([
+      ['Наблюдаемое положение', 'Абзацев', 'Статус доказательности'],
+      ...referenceExamples.map(x=>{
+        const rule=CHECK_AI_MARKER_KB.entries.find(item=>item.id===x.id);
+        return [rule?.title||x.id,String(x.count),rule?.evidence_status||''];
+      })
+    ],[5150,1200,3005],{header:true}));
+    out.push(P('Видеообзоры — пользовательские пересказы и гипотезы; материал одного экономиста — ограниченный авторский ориентир. ' +
+      'Исходные статьи и тексты диссертации не входят в публичную базу. Каталог не является обученной моделью и не раскрывает закрытый алгоритм «Антиплагиата».'));
+  }
+
   out.push(para(`Заключение сформировано автоматически программой «Проверка DOCX на признаки ИИ» v${APP_VERSION} ${res.date.toLocaleString('ru-RU')}. Результаты носят вероятностный характер и подлежат оценке специалистом.`, { style: 'Small' }));
 
   const body = out.join('');

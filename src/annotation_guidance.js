@@ -29,10 +29,12 @@ function annotationAdvice(flag, para) {
   // local, measured constructions instead of repeating the entire paragraph.
   const linguistic = ['stylo','short','content','lang','rep','comp'].includes(type);
   const exact = linguistic && matching.length ? primary : null;
+  const kb = exact ? knowledgeSourceEntry(exact.id) : null;
+  const kbNote = kb ? ' База знаний: ' + kb.title + '; статус ' + kb.evidence_status + '; источник(и): ' + kb.source_ids.join(', ') + '. ' + kb.interpretation : '';
   return {
     issue: exact ? exact.title + '. ' + exact.evidence : observed,
     action: exact ? exact.action : action,
-    reason: exact ? exact.interpretation : 'Собственное правило Check-AI отметило: «' + label + '». Этого недостаточно для установления авторства.',
+    reason: (exact ? exact.interpretation : 'Собственное правило Check-AI отметило: «' + label + '». Этого недостаточно для установления авторства.') + kbNote,
     observation: exact ? exact.evidence : (flag.observation || label),
     metrics: d.metric,
     signalId: exact?.id || null,

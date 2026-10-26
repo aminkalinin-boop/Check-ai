@@ -1,0 +1,428 @@
+{
+  "version": "2026-10-26.1",
+  "schema_version": 1,
+  "source_policy": "Пользовательские пересказы являются гипотезами до подтверждения первоисточником. Никаких закрытых ключей и утверждений о внутреннем устройстве Антиплагиата.",
+  "privacy": "Включены только описания признаков и числовые агрегаты. Пользовательские рукописи, полные видео и статьи не сохраняются в публичном репозитории.",
+  "sources": [
+    {
+      "id": "video01",
+      "type": "user_synthesis",
+      "path": "research/VIDEO_01_HYPOTHESES.md",
+      "verifiedPrimary": false,
+      "title": "Разбор видео 01: типографика, ритм, числовые ссылки"
+    },
+    {
+      "id": "videos0205",
+      "type": "user_synthesis",
+      "path": "research/VIDEO_02_05_HYPOTHESES.md",
+      "verifiedPrimary": false,
+      "title": "Разборы видео 02–05: методология, структуры и парсеры"
+    },
+    {
+      "id": "video06",
+      "type": "user_synthesis",
+      "path": "research/VIDEO_06_HYPOTHESES.md",
+      "verifiedPrimary": false,
+      "title": "Разбор видео 06: дискурс, выводы, терминология"
+    },
+    {
+      "id": "video07",
+      "type": "user_synthesis",
+      "path": "research/VIDEO_07_HYPOTHESES.md",
+      "verifiedPrimary": false,
+      "title": "Разбор видео 07: водяные знаки и L2"
+    },
+    {
+      "id": "fieldAJ",
+      "type": "controlled_observation",
+      "path": "research/FIELD_TEST_AJ_20261026.md",
+      "verifiedPrimary": false,
+      "title": "A–J: 10 машинных кратких статей, известное происхождение"
+    },
+    {
+      "id": "human62",
+      "type": "single_author_statistics",
+      "path": "data/human_baseline.json",
+      "verifiedPrimary": false,
+      "title": "62 исторических статьи одного экономиста, распределения признаков"
+    },
+    {
+      "id": "weber23",
+      "type": "peer_reviewed",
+      "doi": "10.1007/s40979-023-00146-z",
+      "url": "https://doi.org/10.1007/s40979-023-00146-z",
+      "verifiedPrimary": true,
+      "title": "Weber-Wulff et al. (2023): evaluation of AI-text detection tools"
+    },
+    {
+      "id": "liang23",
+      "type": "peer_reviewed",
+      "doi": "10.1016/j.patter.2023.100779",
+      "url": "https://doi.org/10.1016/j.patter.2023.100779",
+      "verifiedPrimary": true,
+      "title": "Liang et al. (2023): bias against non-native English writing"
+    },
+    {
+      "id": "crossdomain25",
+      "type": "peer_reviewed",
+      "url": "https://aclanthology.org/2025.genaidetect-1.45/",
+      "verifiedPrimary": true,
+      "title": "Dugan et al. (2025): cross-domain machine generated text challenge"
+    }
+  ],
+  "entries": [
+    {
+      "id": "technical-provenance",
+      "title": "Метаданные программной сборки DOCX",
+      "evidence_status": "observed",
+      "signal_id": "meta:gen",
+      "interpretation": "Программа могла создать файл Word из любого исходного текста, в том числе человеческого.",
+      "action": "Проверить реальные этапы создания текста, историю правок и черновики. Не выводить авторство только из названия генератора файла.",
+      "source_ids": [
+        "fieldAJ"
+      ],
+      "tags": [
+        "docx",
+        "metadata"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "style-contrast",
+      "title": "Парные противопоставления «не только… но и…»",
+      "evidence_status": "single_author_shift",
+      "signal_id": "contrast",
+      "interpretation": "В одной исторической серии экономических публикаций употребление изменилось после 2022 года, но это наблюдение по одному автору с множеством смешивающих факторов.",
+      "action": "Сопоставить объекты противопоставления с разными экономическими категориями. Сохранять обоснованную конструкцию.",
+      "source_ids": [
+        "video06",
+        "human62"
+      ],
+      "tags": [
+        "discourse",
+        "academic"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "style-preamble",
+      "title": "Академические вводные формулы",
+      "evidence_status": "nonspecific",
+      "signal_id": "preamble",
+      "interpretation": "Фразы встречаются и в человеческих статьях, их отсутствие также не доказывает специальную обработку.",
+      "action": "Проверить, содержит ли преамбула информацию; при необходимости связать предложение с точными данными.",
+      "source_ids": [
+        "video01",
+        "videos0205",
+        "video06",
+        "human62"
+      ],
+      "tags": [
+        "discourse"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "style-inference",
+      "title": "Повторяемые выводные переходы",
+      "evidence_status": "nonspecific",
+      "signal_id": "inference",
+      "interpretation": "«Таким образом» не является сигнатурой одной модели; закономерность следует сравнивать по разделам и жанрам.",
+      "action": "Проверить вывод на предмет нового подтверждённого результата вместо риторического повторения.",
+      "source_ids": [
+        "video06",
+        "human62"
+      ],
+      "tags": [
+        "discourse"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "style-significance",
+      "title": "Оценочные заявления о значимости",
+      "evidence_status": "nonspecific",
+      "signal_id": "significance",
+      "interpretation": "Неопределённые эпитеты могут указывать на слабую аргументацию, но не на происхождение текста.",
+      "action": "Уточнить показатель экономического эффекта, единицы, период и источник.",
+      "source_ids": [
+        "videos0205",
+        "video06"
+      ],
+      "tags": [
+        "economics"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "style-enumeration",
+      "title": "Однотипная нумерация доводов",
+      "evidence_status": "hypothesis",
+      "signal_id": "enumeration",
+      "interpretation": "Последовательность First/Second либо «во-первых» естественна для научного жанра.",
+      "action": "Проверить независимость каждого пункта и логический порядок методики.",
+      "source_ids": [
+        "videos0205"
+      ],
+      "tags": [
+        "discourse"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "style-low-variance",
+      "title": "Равномерность длины предложений",
+      "evidence_status": "small_corpus_observation",
+      "signal_id": "low-variance",
+      "interpretation": "Наблюдалась в отдельных сравнениях моделей и людей; влияет длина текста, научный жанр и пунктуация.",
+      "action": "Определить, обусловлен ли ритм серийным описанием процедур; не менять длины механически.",
+      "source_ids": [
+        "video01",
+        "human62"
+      ],
+      "tags": [
+        "style",
+        "rhythm"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "style-periodic",
+      "title": "Периодичность длины предложений",
+      "evidence_status": "unvalidated_hypothesis",
+      "signal_id": "periodic",
+      "interpretation": "ACF и корреляции могут описывать ритм, но нет опубликованной пороговой калибровки на русских диссертациях.",
+      "action": "Сопоставить периодичность с реальной последовательностью этапов исследования и контрольным корпусом.",
+      "source_ids": [
+        "video01"
+      ],
+      "tags": [
+        "style",
+        "rhythm"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "style-tail",
+      "title": "Повтор завершающих формулировок",
+      "evidence_status": "unvalidated_hypothesis",
+      "signal_id": "tail-repeat",
+      "interpretation": "Лексическое сходство итоговой фразы не тождественно BERTScore и нормальному научному выводу.",
+      "action": "Сверить конец абзаца с установленными данными; удалить только смысловые дубли.",
+      "source_ids": [
+        "video06"
+      ],
+      "tags": [
+        "discourse"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "style-opening",
+      "title": "Одинаковые начала предложений",
+      "evidence_status": "nonspecific",
+      "signal_id": "same-opening",
+      "interpretation": "Повтор начального биграммного сочетания также возникает из-за однотипных результатов.",
+      "action": "Проверить, является ли параллелизм намеренным при перечислении результатов.",
+      "source_ids": [
+        "video06",
+        "human62"
+      ],
+      "tags": [
+        "discourse"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "style-ngram",
+      "title": "Повторяющиеся триграммы",
+      "evidence_status": "unvalidated_hypothesis",
+      "signal_id": "ngram-repeat",
+      "interpretation": "Н-граммы отражают терминологию и повтор темы, а не особую модельную подпись.",
+      "action": "Различать технический термин и необоснованное повторение тезиса.",
+      "source_ids": [
+        "video01",
+        "video06"
+      ],
+      "tags": [
+        "discourse"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "method-causal",
+      "title": "Категоричный причинный вывод",
+      "evidence_status": "methodology_review",
+      "signal_id": "causality",
+      "interpretation": "Нарушение логики может присутствовать и в человеческом тексте, не указывает на конкретную модель.",
+      "action": "Проверить статистическую модель, исходные данные и контроль смешивающих факторов.",
+      "source_ids": [
+        "videos0205"
+      ],
+      "tags": [
+        "economics",
+        "methodology"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "method-quantitative",
+      "title": "Количественные утверждения",
+      "evidence_status": "methodology_review",
+      "signal_id": "quantitative",
+      "interpretation": "Числа без привязки к методике могут быть недостаточно подтверждены, но не обязательно вымышлены.",
+      "action": "Проверить числитель, знаменатель, таблицу, год, единицы измерения.",
+      "source_ids": [
+        "video01",
+        "videos0205"
+      ],
+      "tags": [
+        "economics",
+        "methodology"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "context-table",
+      "title": "Научный текст в таблице",
+      "evidence_status": "context_only",
+      "signal_id": "table-context",
+      "interpretation": "Наличие таблицы не маскирует авторство; структура может мешать отдельным лингвистическим алгоритмам.",
+      "action": "Включить ячейки в охват, но сравнивать с табличными, а не прозаическими контролями.",
+      "source_ids": [
+        "videos0205",
+        "fieldAJ"
+      ],
+      "tags": [
+        "format"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "context-bibliography",
+      "title": "Библиография и DOI",
+      "evidence_status": "context_only",
+      "signal_id": "bibliography",
+      "interpretation": "Отсутствие записи в Crossref не означает её выдуманность; источники бывают незарегистрированы.",
+      "action": "Сверить первоисточник, DOI, год, фамилии и соответствие цитате.",
+      "source_ids": [
+        "video01",
+        "videos0205"
+      ],
+      "tags": [
+        "sources"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "context-heading",
+      "title": "Заголовки и оглавление",
+      "evidence_status": "context_only",
+      "signal_id": "structural",
+      "interpretation": "Внешняя подсветка может захватывать заголовки, у которых нет полноценного стилометрического содержания.",
+      "action": "Проверить границу фрагмента и соседний текст, не переписывая стандартный заголовок.",
+      "source_ids": [
+        "video06"
+      ],
+      "tags": [
+        "format"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "fairness-L2",
+      "title": "Языковой профиль неносителей английского",
+      "evidence_status": "peer_reviewed_limited_population",
+      "signal_id": null,
+      "interpretation": "В исследовании 2023 года семь тогдашних детекторов ошибочно маркировали в среднем 61,3% эссе TOEFL как ИИ; нельзя переносить цифру на русские научные статьи.",
+      "action": "Не выводить авторство из простоты языка, следить за FPR по языковым и жанровым группам.",
+      "source_ids": [
+        "video07",
+        "liang23"
+      ],
+      "tags": [
+        "fairness"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "watermark-providers",
+      "title": "Ключевые статистические знаки модели",
+      "evidence_status": "provider_verifier_required",
+      "signal_id": null,
+      "interpretation": "Статистические метки нельзя установить через U+200B, тире или слова-синонимы без доступа к проверке провайдера.",
+      "action": "В отчёте писать «не проверено», не подменять отсутствие ключа отрицательным результатом.",
+      "source_ids": [
+        "video07"
+      ],
+      "tags": [
+        "provenance"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "translationese",
+      "title": "Признаки перевода",
+      "evidence_status": "unvalidated_hypothesis",
+      "signal_id": null,
+      "interpretation": "Синтаксические кальки возможны и при обычном человеческом переводе. Классификатор происхождения требует самостоятельной валидации.",
+      "action": "Обозначать возможную редакторскую проверку терминологии, но не утверждать обратный перевод.",
+      "source_ids": [
+        "videos0205",
+        "video07",
+        "weber23"
+      ],
+      "tags": [
+        "translation"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "slm-footprint",
+      "title": "«Почерк» локальных моделей 7–9B",
+      "evidence_status": "unvalidated_hypothesis",
+      "signal_id": null,
+      "interpretation": "Нет валидированной сигнатуры модели по одному абзацу. Короткие контексты и повторы бывают у разных моделей и людей.",
+      "action": "Проверять повторяемость как свойство текста, не называть Qwen/Gemma без независимых подтверждений.",
+      "source_ids": [
+        "video07",
+        "crossdomain25"
+      ],
+      "tags": [
+        "models"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "fourth-word",
+      "title": "Замена каждого четвёртого слова",
+      "evidence_status": "unsupported_quantitative_claim",
+      "signal_id": null,
+      "interpretation": "По одному финальному тексту невозможно определить порядок замен. Проценты 92/66/17/0 из пересказа не воспроизведены.",
+      "action": "Не включать счётчик «заменённого четвёртого слова» и не рекомендовать механические синонимы.",
+      "source_ids": [
+        "video07",
+        "weber23"
+      ],
+      "tags": [
+        "robustness"
+      ],
+      "changes_verdict": false
+    },
+    {
+      "id": "local-scoring",
+      "title": "Оценка коротких статей A–J",
+      "evidence_status": "controlled_observation",
+      "signal_id": null,
+      "interpretation": "Исходный Check-AI 3.3 обнаруживал только python-docx у 10/10, а при очистке метаданных языковых сигналов не осталось.",
+      "action": "Использовать A–J как диагностический набор, не как обучающую и тестовую выборки одновременно.",
+      "source_ids": [
+        "fieldAJ"
+      ],
+      "tags": [
+        "evaluation"
+      ],
+      "changes_verdict": false
+    }
+  ]
+}
