@@ -47,7 +47,7 @@ async function buildReportDocx(res) {
 
   /* ---------- резюме ---------- */
   out.push(H1('Краткое резюме'));
-  const summ = [v.text + (v.confidence !== '—' ? ` (уверенность — ${v.confidence}).` : '.')];
+  const summ = [v.text + (v.confidence !== '—' ? ` (качественная оценка признаков — ${v.confidence}).` : '.')];
   if (v.mainSource) summ.push(`Наиболее вероятный источник по техническим следам: ${v.mainSource}. Характер использования: ${v.scale}.`);
   summ.push(`Выявлено признаков: сильных — ${s.counts.strong}, средних — ${s.counts.medium}, слабых — ${s.counts.weak}, справочных — ${s.counts.info}.`);
   out.push(box('Итоговая экспертная оценка', summ));
@@ -232,7 +232,7 @@ async function buildReportDocx(res) {
 
   /* ---------- 7 ---------- */
   out.push(H1('7. Интегральная оценка'));
-  out.push(table([['Обстоятельство', 'Вывод', 'Уверенность'],
+  out.push(table([['Обстоятельство', 'Вывод', 'Качественная оценка'],
     ['Факт применения генеративного ИИ', v.text, v.confidence],
     ['Связь с конкретным сервисом', v.mainSource ? `Наиболее вероятен ${v.mainSource}` : 'Не установлена', v.mainSource ? (s.counts.strong ? 'высокая, но не абсолютная' : 'средняя') : '—'],
     ['Характер и масштаб применения', v.scale, '—'],
