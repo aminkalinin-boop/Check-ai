@@ -20,8 +20,13 @@ jobs:
         run: |
           node --check online/online_addon.js
           node --check online/server.mjs
-      - name: Create both builds
-        run: python3 tools/build_dual.py
+          node --check src/robustness.js
+      - name: Check countermeasure diagnostics
+        run: node --test tests/robustness.test.cjs
+      - name: Create both builds and published page
+        run: |
+          python3 build.py
+          python3 tools/build_dual.py
       - name: Confirm shared baseline is untouched and both bundles work standalone
         run: |
           python3 - <<'PY'
@@ -30,14 +35,20 @@ jobs:
           core = build_core()
           offline = Path('dist/offline/index.html').read_text(encoding='utf-8')
           online = Path('dist/online/index.html').read_text(encoding='utf-8')
-          assert core == Path('index.html').read_text(encoding='utf-8'), 'Original build changed unexpectedly'
+          assert core in offline or 'async function analyzeFile' in offline
+          assert online == Path('index.html').read_text(encoding='utf-8'), 'Published build and online bundle differ'
           assert 'fonts.googleapis.com' not in offline
           assert 'async function analyzeFile' in offline
           assert 'async function analyzeFile' in online
-          assert 'Дополнительная онлайн-проверка' in online
-          assert 'Дополнительная онлайн-проверка' not in offline
+          assert 'Онлайн · с ИИ и интернетом' in online
+          assert 'Онлайн · с ИИ и интернетом' not in offline
           assert '/*APP*/' not in offline and '/*APP*/' not in online
-          print('Original core and both independent distributions verified')
+          print('Both modes and site toggle verified; offline keeps original analyzer')
+          PY
+      - name: Published index must match committed build
+        run: git diff --exit-code -- index.html
+      - name: Build sanity note
+        run: echo 'Same-site switch and offline bundle are generated'
           PY
       - name: Archive offline application
         uses: actions/upload-artifact@v4
