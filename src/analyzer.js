@@ -908,35 +908,39 @@ function finalize(res) {
   res.stats.sources = Object.entries(sources).sort((a, b) => b[1] - a[1]);
   const mainSrc = F.some(f => f.id === 'combo:gemini') ? 'Google Gemini / Google AI Studio' : (res.stats.sources[0] ? res.stats.sources[0][0] : null);
 
-  let verdict, conf, scale;
-  if (strong.length) {
-    verdict = 'Выявлены прямые признаки применения генеративного ИИ';
-    conf = (strong.length >= 2 || share >= 20) ? 'высокая' : 'средняя';
-  } else if (medium.filter(f => ['tech', 'meta', 'chars', 'text'].includes(f.group)).length >= 2) {
-    verdict = 'Выявлены косвенные технические признаки использования нейросетевых сервисов';
-    conf = 'средняя';
-  } else if (!F.some(f => ['tech', 'meta', 'chars', 'text'].includes(f.group) && ['medium', 'weak'].includes(f.level)) && F.some(f => ['comp', 'src'].includes(f.group) && f.level !== 'info')) {
-    verdict = 'Технических следов нейросетевых сервисов не выявлено; есть недоработки ссылочного аппарата и следы черновой компиляции';
-    conf = 'низкая';
+  // Классификация относится к обнаруженным маркерам, но НЕ к вероятности авторства.
+  // Даже специфическая разметка устанавливает путь переноса контента, а не способ его создания.
+  const technical = F.filter(f => ['tech', 'meta', 'chars', 'text'].includes(f.group));
+  const technicalStrong = technical.filter(f => f.level === 'strong');
+  const technicalMedium = technical.filter(f => f.level === 'medium');
+  let verdict, evidence, scale;
+  if (technicalStrong.length) {
+    verdict = 'Обнаружены специфические технические маркеры, требующие проверки происхождения фрагментов';
+    evidence = 'специфические технические';
+  } else if (technicalMedium.length >= 2) {
+    verdict = 'Обнаружено сочетание косвенных технических маркеров веб-обработки документа';
+    evidence = 'косвенные технические';
+  } else if (F.some(f => ['comp', 'src'].includes(f.group) && f.level !== 'info') && !technicalMedium.length) {
+    verdict = 'Выявлены замечания к структуре документа и ссылкам; специфических технических следов не обнаружено';
+    evidence = 'замечания к качеству документа';
   } else if (F.some(f => f.id === 'styloA' && f.level === 'medium')) {
-    verdict = 'Технических следов ИИ не выявлено; лексический профиль текста близок к текстам LLM';
-    conf = 'низкая';
-  } else if (F.some(f => f.id === 'styloA' && f.level === 'weak') && !F.some(f => ['tech', 'meta', 'chars', 'text'].includes(f.group) && ['strong', 'medium'].includes(f.level))) {
-    verdict = 'Технических следов ИИ не выявлено; есть отдельные стилистические признаки возможной правки текста с помощью ИИ';
-    conf = 'низкая';
-  } else if (medium.length || weak.length >= 3) {
-    verdict = 'Выявлены отдельные слабые признаки; прямых признаков не обнаружено';
-    conf = 'низкая';
+    verdict = 'Лексический профиль имеет сходство с некоторыми текстами LLM; технического подтверждения нет';
+    evidence = 'стилометрические, неспецифичные';
+  } else if (F.some(f => f.id === 'styloA' && f.level === 'weak') && !technicalMedium.length) {
+    verdict = 'Есть отдельные стилометрические особенности; технического подтверждения нет';
+    evidence = 'слабые, неспецифичные';
+  } else if (technicalMedium.length || medium.length || weak.length >= 3) {
+    verdict = 'Есть отдельные косвенные признаки; оснований для вывода о происхождении текста недостаточно';
+    evidence = 'отдельные косвенные';
   } else {
-    verdict = 'Признаков применения генеративного ИИ не выявлено';
-    conf = '—';
+    verdict = 'Специфических технических следов не выявлено; происхождение текста не установлено';
+    evidence = 'не выявлены';
   }
-  if (share >= 50) scale = 'системное (признак охватывает большую часть связного текста)';
-  else if (share >= 10) scale = 'существенное, фрагментарное';
-  else if (share > 0) scale = 'эпизодическое';
-  else if (res.stats.runMarkedParas) scale = `фрагментарное: веб-разметка сохранилась внутри ${fmtNum(res.stats.runMarkedParas)} абзацев/ячеек (${fmtNum(res.stats.runMarkedWords)} слов)`;
-  else scale = 'не оценивается по стилям (размеченный текст не обнаружен)';
-  res.verdict = { text: verdict, confidence: conf, scale, mainSource: mainSrc, share };
+  // Это охват сохранившейся РАЗМЕТКИ, а не процент текста, созданного ИИ.
+  if (share > 0) scale = `разметка на уровне абзацев охватывает ${fmtPct(share)} основного текста`;
+  else if (res.stats.runMarkedParas) scale = `разметка отдельных фрагментов: ${fmtNum(res.stats.runMarkedParas)} абзацев/ячеек, ${fmtNum(res.stats.runMarkedWords)} слов`;
+  else scale = 'диагностическая разметка на уровне абзацев не найдена';
+  res.verdict = { text: verdict, evidence, scale, mainSource: mainSrc, share };
 
   const human = [];
   if (res.meta.tables) human.push(`таблицы (${res.meta.tables})`);
