@@ -223,6 +223,7 @@ async function analyzeFile(file, onProgress = () => {}) {
     dashChecks(res);
     robustnessChecks(res);
     academicAuditChecks(res);
+    discourseAuditChecks(res);
     finalize(res);
     return res;
   }
@@ -287,6 +288,7 @@ async function analyzeFile(file, onProgress = () => {}) {
   dashChecks(res);
   robustnessChecks(res);
   academicAuditChecks(res);
+  discourseAuditChecks(res);
   finalize(res);
   return res;
 }
