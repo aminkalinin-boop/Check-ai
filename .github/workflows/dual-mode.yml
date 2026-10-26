@@ -29,6 +29,9 @@ jobs:
           node --check src/annotation_guidance.js
           node --check src/reference_highlights.js
           node --check src/linguistic_diagnostics.js
+          node --check src/knowledge_integration.js
+          node --test tests/knowledge_integration.test.cjs
+          python3 -m json.tool data/marker_evidence.json > /dev/null
           node --test tests/linguistic_diagnostics.test.cjs
           node --test tests/reference_highlights.test.cjs
           node --test tests/short_text_audit.test.cjs tests/annotation_guidance.test.cjs
