@@ -1,0 +1,51 @@
+name: Build Check-AI online and offline (shared original core)
+
+on:
+  push:
+    branches: [main, 'feature/dual-mode-*']
+  pull_request:
+
+jobs:
+  two-builds:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify optional online JavaScript and server syntax
+        run: |
+          node --check online/online_addon.js
+          node --check online/server.mjs
+      - name: Create both builds
+        run: python3 tools/build_dual.py
+      - name: Confirm shared baseline is untouched and both bundles work standalone
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from tools.build_dual import build_core
+          core = build_core()
+          offline = Path('dist/offline/index.html').read_text(encoding='utf-8')
+          online = Path('dist/online/index.html').read_text(encoding='utf-8')
+          assert core == Path('index.html').read_text(encoding='utf-8'), 'Original build changed unexpectedly'
+          assert 'fonts.googleapis.com' not in offline
+          assert 'async function analyzeFile' in offline
+          assert 'async function analyzeFile' in online
+          assert 'Дополнительная онлайн-проверка' in online
+          assert 'Дополнительная онлайн-проверка' not in offline
+          assert '/*APP*/' not in offline and '/*APP*/' not in online
+          print('Original core and both independent distributions verified')
+          PY
+      - name: Archive offline application
+        uses: actions/upload-artifact@v4
+        with:
+          name: Check-AI-Offline
+          path: dist/offline/index.html
+      - name: Archive online application
+        uses: actions/upload-artifact@v4
+        with:
+          name: Check-AI-Online
+          path: dist/online/index.html
