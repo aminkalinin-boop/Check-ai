@@ -74,3 +74,13 @@ test('Annotated outputs use observations and actions, not a copy of marked passa
  assert.match(report,/Диагностические карточки Check-AI/);
  assert.match(anno,/Измеримый признак/);
 });
+
+
+test('Repeated scientific trigrams are reported with counts but no authorship verdict',()=>{
+ const paragraph=('Управление запасами предприятий предполагает системный анализ данных. '+
+ 'При этом управление запасами предприятий требует учёта затрат. ').repeat(5);
+ const d=diagnose(paragraph);
+ assert.ok(ids(d).includes('ngram-repeat'));
+ assert.ok(d.metric.repeatedTrigramTypes>0);
+ assert.match(d.signals.find(x=>x.id==='ngram-repeat').action,/Сохраняйте устойчивый экономический термин/);
+});
