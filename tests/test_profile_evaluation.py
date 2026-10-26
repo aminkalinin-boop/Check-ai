@@ -16,7 +16,10 @@ class ProfileAndKnowledgeTests(unittest.TestCase):
         self.assertIsNotNone(match)
         embedded=json.loads(match.group(1))
         base=json.loads((ROOT/"data/human_baseline.json").read_text(encoding="utf-8"))
-        self.assertEqual(embedded,base,"Legacy baseline drifted from its source file")
+        self.assertEqual(embedded["features"],base["features"],"Embedded reference percentiles drifted from source file")
+        self.assertEqual(embedded["n_human"],base["n_human"])
+        self.assertEqual(embedded["n_post"],base["n_post"])
+        # The source includes a prose description not present in compiled JS.
         self.assertEqual(base["n_human"],62)
         self.assertEqual(base["n_post"],17)
 
