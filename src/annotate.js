@@ -81,13 +81,28 @@ async function buildAnnotatedDocx(res) {
     'Это копия для анализа; исходный файл не изменён.',
   ]);
 
+  const manualByPara = new Map();
+  if (res.reference) for (const fragment of res.reference.fragments) {
+    if (!manualByPara.has(fragment.para)) manualByPara.set(fragment.para, []);
+    manualByPara.get(fragment.para).push(fragment);
+  }
   res.paras.forEach((para, i) => {
     const flags = para.flags.filter(f => f.level !== 'info' || f.type === 'short');
-    if (!flags.length || !all[i]) return;
+    const reference = manualByPara.get(i) || [];
+    if ((!flags.length && !reference.length) || !all[i]) return;
     const top = flags.reduce((m, f) => LVL_ORDER[f.level] > LVL_ORDER[m] ? f.level : m, 'info');
     const runs = ownRuns(all[i]);
     if (!runs.length) return;
-    runs.forEach(r => shadeRun(doc, r, FILL[top]));
+    if (flags.length) {
+      runs.forEach(r => {
+        // Do not erase colors copied from the source/vendor report.
+        if (res.reference) {
+          const p = childW(r, 'rPr');
+          if (childW(p, 'highlight') || childW(p, 'shd')) return;
+        }
+        shadeRun(doc, r, FILL[top]);
+      });
+    }
     marked++;
     if (!para.inBox) {
       const uniq = [...new Map(flags.map(f => [f.label, f])).values()].sort((a, b) => LVL_ORDER[b.level] - LVL_ORDER[a.level]);
@@ -103,7 +118,15 @@ async function buildAnnotatedDocx(res) {
         'Абзац №' + (i + 1) + ': научная редакторская проверка',
         'Начало: «' + para.text.trim().slice(0, 125) + '»',
         ...tasks,
-        'Ограничение: замечание не устанавливает авторство и не гарантирует изменение оценки внешнего детектора.'
+        ...reference.slice(0, 10).flatMap((f, k) => [
+          'Внешнее выделение №' + f.id + ' (' + f.category + '): «' + f.text.slice(0, 380) + '»',
+          'Проблема внешнего выделения ' + (k + 1) + ': ' + f.problem,
+          'Действие по проверке внешнего выделения ' + (k + 1) + ': ' + f.action,
+          'Собственные признаки в этом абзаце: ' +
+            (f.flags.filter(z => ['strong','medium','weak'].includes(z.level)).map(z => z.label).join('; ') || 'не найдены')
+        ]),
+        ...(reference.length > 10 ? ['Остальные внешние выделения в этом абзаце см. в приложении к заключению.'] : []),
+        'Ограничение: внешняя подсветка — не подтверждённое авторство; исправления не гарантируют изменение оценки другого детектора.'
       ]);
     }
   });
