@@ -22,6 +22,8 @@ test('Exact source-backed cliche gives relevant action and no authorship asserti
   assert.ok(found.some(x=>x.id==='generic-openers'));
   assert.ok(found.every(x=>x.action.length>30&&x.section));
   assert.equal(ctx.standard.version,'5.2.3-2026-10-18');
+  assert.equal(ctx.standard.promptConditioning.length,4);
+  assert.ok(ctx.standard.promptConditioning.every(x=>/не |нельзя/.test(x.caveat)));
 });
 test('Economic terminology is matched rather than rewriting whole paragraph',()=>{
   const matches=ctx.scan('Доходность предприятия выросла. ВВП региона увеличился.',20);
