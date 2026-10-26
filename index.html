@@ -2868,6 +2868,20 @@ const CHECK_AI_AUTHOR_STANDARD = Object.freeze({
   version:'5.2.3-2026-10-18',
   source:'Авторские правила научной статьи по специальности 5.2.3, редакция 18.10.2026',
   limits:'Индивидуальный стандарт конкретной научной редакции. Нарушение правила не доказывает ИИ-генерацию; корректность термина зависит от контекста.',
+  promptConditioning:[
+    {id:'cliche-avoidance',instruction:'Запрет шаблонных вводных и итоговых конструкций',
+      observation:'Частота устойчивых клише может снизиться',
+      caveat:'Низкая частота клише не подтверждает человеческое происхождение текста.'},
+    {id:'terminology-constraint',instruction:'Предписанный словарь экономической терминологии',
+      observation:'Терминология становится последовательнее и ближе к заданному стилю',
+      caveat:'Корректное употребление терминов не показывает, человеком или моделью написан текст.'},
+    {id:'author-voice',instruction:'Изложение через действие исследователя, первоисточники и расчёты',
+      observation:'Вместо обобщённых формул появляются предметные указания на метод и данные',
+      caveat:'Истинность источников, вычислений и авторства по форме фразы не устанавливается.'},
+    {id:'structural-novelty',instruction:'Разнообразие начал абзацев и композиционных моделей',
+      observation:'Могут сократиться повторы и композиционные шаблоны',
+      caveat:'Снижение повторов может быть редакторским эффектом; конкретный промпт по рукописи не восстанавливается.'}
+  ],
   classes:{
     formula:'Риторическая/шаблонная формула',
     language:'Авторская стилистическая норма',
@@ -3002,7 +3016,8 @@ function authorGuidelineAudit(res) {
     }
   }
   const result={version:CHECK_AI_AUTHOR_STANDARD.version,source:CHECK_AI_AUTHOR_STANDARD.source,
-    limits:CHECK_AI_AUTHOR_STANDARD.limits,ruleCount:CHECK_AI_AUTHOR_RULES.length,
+    limits:CHECK_AI_AUTHOR_STANDARD.limits,promptConditioning:CHECK_AI_AUTHOR_STANDARD.promptConditioning,
+    ruleCount:CHECK_AI_AUTHOR_RULES.length,
     paragraphsReviewed:paras.length,paragraphsWithNotes:marked,matches,byKind:groups,examples,
     verdictImpact:'none',scope:'Стилистическая и предметная редактура; не вероятность авторства.'};
   if(!res.stats)res.stats={};
@@ -3606,6 +3621,7 @@ async function buildReportDocx(res) {
       '; проверок: '+a.ruleCount+'; абзацев с рекомендациями: '+a.paragraphsWithNotes+
       '; замечаний: '+a.matches+'.'));
     out.push(P(a.limits+' Проверки не участвуют в оценке происхождения текста и не раскрывают механизм внешних детекторов.'));
+    out.push(P('Строго сформулированный промпт способен уменьшить частоту клише и структурных повторов. По отсутствию таких конструкций нельзя доказывать человеческое происхождение или устанавливать конкретную инструкцию модели.'));
     for (const e of a.examples.slice(0,60)) {
       out.push(H2('Абзац №'+(e.para+1)+': '+e.title));
       out.push(P('Точное выражение: «'+e.quote+'»; раздел правил: '+e.section+'.'));
@@ -4006,7 +4022,12 @@ function render(r) {
       '<h3>Авторский стандарт статьи 5.2.3 (18.10.2026)</h3>'+
       '<p class="muted small">'+esc(A.source)+'. '+esc(A.limits)+
       ' Это индивидуальные рекомендации: они НЕ повышают число сильных/средних/слабых признаков и не меняют вывод Check-AI.</p>'+
-      '<div class="kpis">'+[
+      '<h4>Чувствительность к заданному промпту</h4>'+
+      '<p class="muted small">Примеры того, как сам текст инструкции может изменить наблюдаемую форму рукописи. Ни один сценарий не означает, что реальный промпт был таким; происхождение проверяют только на известных контрольных примерах.</p>'+
+      '<table><thead><tr><th>Тип ограничения</th><th>Изменение формы текста</th><th>Ограничение вывода</th></tr></thead><tbody>'+
+      A.promptConditioning.map(x=>'<tr><td>'+esc(x.instruction)+'</td><td>'+esc(x.observation)+'</td><td>'+esc(x.caveat)+'</td></tr>').join('')+
+      '</tbody></table>'+
+      '<div class="kpis">+[
         ['Редакторских правил',A.ruleCount,'конкретные шаблоны'],
         ['Абзацев проверено',A.paragraphsReviewed,'без библиографии, таблиц и заголовков'],
         ['Абзацев с замечаниями',A.paragraphsWithNotes,'не доля ИИ'],
