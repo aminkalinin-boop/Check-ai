@@ -26,7 +26,7 @@ jobs:
           node --check src/provenance_fairness.js
           node --check src/offline_engine.js
           node --check online/site_config.js
-          node --test tests/offline_engine.test.cjs
+          node --test tests/offline_engine.test.cjs tests/mode_pipeline.test.cjs
       - name: Check countermeasure diagnostics
         run: node --test tests/robustness.test.cjs tests/academic_audit.test.cjs tests/discourse_audit.test.cjs tests/provenance_fairness.test.cjs
       - name: Validate local reference-highlight audit (no source documents uploaded)
