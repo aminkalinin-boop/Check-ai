@@ -118,7 +118,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
     <div class="muted">Поддерживаются .docx, а также .txt и .md (только текстовые проверки)</div>
     <input id="file" type="file" accept=".docx,.docm,.txt,.md" hidden>
   </div>
-  <div class="note"><span>Документ разбирается прямо в браузере на вашем устройстве и никуда не отправляется. Статистические водяные знаки разработчиков моделей (Claude, Gemini SynthID) программа не видит: их проверяют только сами компании.</span></div>
+  <div class="note"><span>Основной анализ выполняется в браузере, без отправки файла. В онлайн-режиме отдельно выбранные фрагменты могут передаваться внешним сервисам только после вашего согласия. Статистические водяные знаки Google SynthID-Text, Claude и OpenAI textGrain программа не проверяет: для этого нужен поддерживаемый верификатор поставщика модели.</span></div>
 
 
   <div id="progress" hidden><div class="spin"></div><span id="status"></span></div>
@@ -133,6 +133,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
     </div>
     <div id="verdict" class="verdict"></div>
     <div id="kpis" class="kpis"></div>
+    <div id="provenance-summary" class="card" role="group" aria-label="Четыре класса наблюдений и возможность проверки водяных знаков"></div>
     <div class="card">
       <h3>Карта документа</h3>
       <div id="map"></div>
@@ -160,7 +161,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
     <div class="pane" id="pane-meta" hidden><div id="meta"></div></div>
   </div>
 
-  <footer>Результаты носят вероятностный характер: признак показывает, что текст проходил через соответствующий сервис или веб-страницу, но не устанавливает авторство и долю машинного текста.</footer>
+  <footer>Результаты показывают обнаруженные технические и языковые особенности; многие имеют альтернативные объяснения. Качественная оценка не является вероятностью авторства, статистическим доверительным интервалом или основанием для автоматического обвинения.</footer>
 </div>
 <script>/*JSZIP*/</script>
 <script>/*APP*/</script>

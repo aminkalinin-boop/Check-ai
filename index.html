@@ -118,7 +118,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
     <div class="muted">Поддерживаются .docx, а также .txt и .md (только текстовые проверки)</div>
     <input id="file" type="file" accept=".docx,.docm,.txt,.md" hidden>
   </div>
-  <div class="note"><span>Документ разбирается прямо в браузере на вашем устройстве и никуда не отправляется. Статистические водяные знаки разработчиков моделей (Claude, Gemini SynthID) программа не видит: их проверяют только сами компании.</span></div>
+  <div class="note"><span>Основной анализ выполняется в браузере, без отправки файла. В онлайн-режиме отдельно выбранные фрагменты могут передаваться внешним сервисам только после вашего согласия. Статистические водяные знаки Google SynthID-Text, Claude и OpenAI textGrain программа не проверяет: для этого нужен поддерживаемый верификатор поставщика модели.</span></div>
 
 
   <div id="progress" hidden><div class="spin"></div><span id="status"></span></div>
@@ -133,6 +133,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
     </div>
     <div id="verdict" class="verdict"></div>
     <div id="kpis" class="kpis"></div>
+    <div id="provenance-summary" class="card" role="group" aria-label="Четыре класса наблюдений и возможность проверки водяных знаков"></div>
     <div class="card">
       <h3>Карта документа</h3>
       <div id="map"></div>
@@ -160,7 +161,7 @@ button:focus-visible,.tab:focus-visible,.cell:focus-visible{outline:2px solid va
     <div class="pane" id="pane-meta" hidden><div id="meta"></div></div>
   </div>
 
-  <footer>Результаты носят вероятностный характер: признак показывает, что текст проходил через соответствующий сервис или веб-страницу, но не устанавливает авторство и долю машинного текста.</footer>
+  <footer>Результаты показывают обнаруженные технические и языковые особенности; многие имеют альтернативные объяснения. Качественная оценка не является вероятностью авторства, статистическим доверительным интервалом или основанием для автоматического обвинения.</footer>
 </div>
 <script>/*!
 
@@ -401,6 +402,7 @@ async function analyzeFile(file, onProgress = () => {}) {
     robustnessChecks(res);
     academicAuditChecks(res);
     discourseAuditChecks(res);
+    provenanceFairnessChecks(res);
     finalize(res);
     return res;
   }
@@ -466,6 +468,7 @@ async function analyzeFile(file, onProgress = () => {}) {
   robustnessChecks(res);
   academicAuditChecks(res);
   discourseAuditChecks(res);
+  provenanceFairnessChecks(res);
   finalize(res);
   return res;
 }
@@ -2176,6 +2179,88 @@ function discourseAuditChecks(res) {
   };
 }
 
+/* Check-AI: provenance classes and fairness context (video 07).
+   IMPORTANT: Neither document parsing nor lexical analysis can verify
+   provider-keyed statistical text watermarks. NO invented confidence scores,
+   calibrated posterior probabilities or claims of the writer's identity. */
+'use strict';
+
+function provenanceFairnessChecks(res) {
+  const findings = res.findings || [];
+  const paragraphs = (res.paras || []).filter(p => p && p.words > 0 && !p.toc && !p.bib && !p.inBox);
+  const visibleIds = new Set([
+    'typo:q', 'emoji', 'md:bold', 'md:hdr', 'md:hr', 'md:code',
+    'md:tbl', 'md:link', 'md:bullet'
+  ]);
+  const unicodeIds = new Set([
+    'char:zw', 'char:tag', 'char:vs', 'char:bidi', 'char:soft', 'char:sp',
+    'char:nbsp', 'char:pua', 'academic:mixed-script', 'academic:inside-word'
+  ]);
+  const visible = findings.filter(f => visibleIds.has(f.id));
+  const unicode = findings.filter(f => unicodeIds.has(f.id));
+  const stylistic = findings.filter(f =>
+    f.group === 'style' || f.id === 'lexicon' || f.id === 'categorical'
+  );
+
+  // Labels describe categories of observations, not their authorship value.
+  const classes = [
+    { id: 'visible', title: 'Визуальные и форматные особенности', count: visible.length,
+      status: visible.length ? 'Есть наблюдения' : 'Не зафиксированы перечисленные маркеры',
+      detail: 'Тире, кавычки, списки и Markdown могут появиться в обычной редакторской работе.' },
+    { id: 'unicode', title: 'Скрытые символы и техническая разметка', count: unicode.length,
+      status: unicode.length ? 'Есть наблюдения' : 'Не зафиксированы перечисленные маркеры',
+      detail: 'Символы Unicode и HTML-стили не являются статистическими текстовыми водяными знаками моделей.' },
+    { id: 'stylometry', title: 'Лексика и стилометрия', count: stylistic.length,
+      status: stylistic.length ? 'Есть показатели' : 'Нет выделенных показателей',
+      detail: 'Зависит от языка, научного жанра, дисциплины, редакторской обработки и корпуса сравнения.' },
+    { id: 'watermark', title: 'Статистический водяной знак модели', count: null,
+      status: 'Не проверялся — нет доступа к ключам и верификатору провайдера',
+      detail: 'Отсутствие результата означает «не проверено», а не «водяного знака нет».' }
+  ];
+  const latinBody = paragraphs.filter(p => !p.inTable && !p.heading);
+  let latin = 0, cyrillic = 0, latinWords = 0;
+  for (const p of latinBody) {
+    const a = (p.text.match(/[A-Za-z]/g) || []).length;
+    const b = (p.text.match(/[А-ЯЁа-яё]/g) || []).length;
+    if (a > b * 2 && a >= 20) latinWords += p.words;
+    latin += a; cyrillic += b;
+  }
+  const predominantlyEnglish = latinWords >= 300 && latin > cyrillic * 2;
+  const meta = {
+    classes, watermark: {
+      status: 'not_checked', keyAccess: false, detectionRun: false,
+      vendorIdentity: null, detected: null
+    },
+    predominantlyEnglish, latinWords,
+    limitations: [
+      'Статистические знаки Google SynthID-Text, Claude и OpenAI textGrain не определяются по символам, пунктуации или стилометрии.',
+      'Анализ языкового стиля не устанавливает автора и не доказывает нарушение требований организации.',
+      'Без независимого калибровочного исследования нельзя публиковать вероятность ИИ-авторства и доверительный интервал.'
+    ]
+  };
+  res.stats.provenance = meta;
+
+  if (predominantlyEnglish) {
+    addFinding(res, {
+      id: 'provenance:language', group: 'style', level: 'info', value: latinWords,
+      title: 'Англоязычный текст: защита от ложных срабатываний',
+      detail: 'Преимущественно англоязычных слов вне таблиц: около ' + latinWords + '.',
+      note: 'Лексика и предсказуемость английских научных текстов зависят от владения языком, перевода, научного жанра и редакторской правки. ' +
+        'Нельзя считать простоту языка или грамматическую правильность доказательством ИИ. Авторский языковой профиль не устанавливается автоматически.'
+    });
+  }
+
+  // This finding gives an explicit auditable "not checked" result in both
+  // offline and online baseline; online model review cannot change this flag.
+  addFinding(res, {
+    id: 'provenance:watermark', group: 'tech', level: 'info', value: 'не проверено',
+    title: 'Статистические текстовые водяные знаки: проверка недоступна',
+    detail: 'Check-AI не располагает ключами и доверенным API проверки встроенных меток Google SynthID-Text, Claude или OpenAI textGrain.',
+    note: 'Скрытые пробелы и символы нулевой ширины — не такие водяные знаки. Их удаление не позволяет установить наличие или отсутствие метки. ' +
+      'Для подтверждения происхождения нужны поддерживаемые средства верификации провайдера. Даже подтверждённая метка указывает на возможное участие модели, а не на личность автора, долю генерации или нарушение.'
+  });
+}
+
 /* ===================================================================
    Формирование экспертного заключения в формате DOCX (OOXML вручную)
    =================================================================== */
@@ -2292,7 +2377,7 @@ async function buildReportDocx(res) {
 
   /* ---------- резюме ---------- */
   out.push(H1('Краткое резюме'));
-  const summ = [v.text + (v.confidence !== '—' ? ` (уверенность — ${v.confidence}).` : '.')];
+  const summ = [v.text + (v.confidence !== '—' ? ` (качественная оценка признаков — ${v.confidence}).` : '.')];
   if (v.mainSource) summ.push(`Наиболее вероятный источник по техническим следам: ${v.mainSource}. Характер использования: ${v.scale}.`);
   summ.push(`Выявлено признаков: сильных — ${s.counts.strong}, средних — ${s.counts.medium}, слабых — ${s.counts.weak}, справочных — ${s.counts.info}.`);
   out.push(box('Итоговая экспертная оценка', summ));
@@ -2308,6 +2393,8 @@ async function buildReportDocx(res) {
   const bounds = ['По одному итоговому файлу невозможно установить точную долю первоначально машинного текста, конкретную модель и её версию, содержание запросов, личность пользователя, последовательность редакций и степень переработки каждого фрагмента. Для этого необходимы исходные рабочие файлы, история версий, переписка с моделью, данные браузера и облачных сервисов.'];
   if (usedWeb.some(f => /Angular|Tailwind/.test(f.style.source))) bounds.push('Классы Angular и Tailwind являются маркерами веб-фреймворков, а не уникальными «водяными знаками» генеративной модели; их доказательственное значение возрастает только в совокупности с другими признаками.');
   bounds.push('Не проверялись статистические водяные знаки разработчиков моделей (Anthropic Claude, Google SynthID и др.): их обнаружение возможно только инструментами этих компаний. Заключение сформировано автоматически и подлежит оценке специалистом.');
+  bounds.push('Уровень уверенности в настоящем заключении — качественная экспертная оценка совокупности признаков, а не откалиброванная вероятность авторства. Доверительный интервал и статистическая значимость для факта авторства не рассчитывались. Результат не должен использоваться как единственное основание для дисциплинарного решения.');
+  if (s.provenance && s.provenance.predominantlyEnglish) bounds.push('Значительная часть связного текста написана по-английски. Языковая предсказуемость и простота формулировок зависят от владения языком и научного жанра. Калибровка стилометрии на таком материале не выполнялась.');
   out.push(box('Границы вывода', bounds, 'FFF6E5'));
 
   /* ---------- 1 ---------- */
@@ -2475,7 +2562,7 @@ async function buildReportDocx(res) {
 
   /* ---------- 7 ---------- */
   out.push(H1('7. Интегральная оценка'));
-  out.push(table([['Обстоятельство', 'Вывод', 'Уверенность'],
+  out.push(table([['Обстоятельство', 'Вывод', 'Качественная оценка'],
     ['Факт применения генеративного ИИ', v.text, v.confidence],
     ['Связь с конкретным сервисом', v.mainSource ? `Наиболее вероятен ${v.mainSource}` : 'Не установлена', v.mainSource ? (s.counts.strong ? 'высокая, но не абсолютная' : 'средняя') : '—'],
     ['Характер и масштаб применения', v.scale, '—'],
@@ -2716,7 +2803,7 @@ function render(r) {
   $('#verdict').className = 'verdict ' + vClass;
   $('#verdict').innerHTML = `
     <div class="v-head"><div><div class="eyebrow">Итоговая оценка</div><h2>${esc(v.text)}</h2></div>
-      ${v.confidence !== '—' ? `<div class="conf">уверенность<br><b>${esc(v.confidence)}</b></div>` : ''}</div>
+      ${v.confidence !== '—' ? `<div class="conf">оценка признаков<br><b>${esc(v.confidence)}</b></div>` : ''}</div>
     <p>${v.mainSource ? `Наиболее вероятный источник по техническим следам: <b>${esc(v.mainSource)}</b>. Характер использования: ${esc(v.scale)}.` : 'Разметки веб-интерфейсов нейросетей в тексте не найдено.'}</p>
     ${r.human.length ? `<p class="muted">Признаки самостоятельной работы: ${esc(r.human.join(', '))}.</p>` : ''}
     <p class="muted small">Файл: ${esc(r.file.name)} · ${fmtNum(r.file.size)} байт · SHA-256 <code>${r.file.sha256}</code></p>`;
@@ -2727,6 +2814,20 @@ function render(r) {
     ['Средние признаки', s.counts.medium, 'косвенные технические'],
     ['Слабые признаки', s.counts.weak, 'статистические, неспецифичные'],
   ].map(([t, n, d]) => `<div class="kpi"><div class="kpi-t">${t}</div><div class="kpi-n">${n}</div><div class="kpi-d">${esc(d)}</div></div>`).join('');
+
+
+  // Четыре типа наблюдений. Отсутствие доступа к ключам — НЕ отрицательная проверка.
+  const E = s.provenance;
+  if (E && document.getElementById('provenance-summary')) {
+    $('#provenance-summary').innerHTML = '<h3>Классы наблюдений и границы проверки</h3>' +
+      '<p class="muted small">Это независимые источники сведений, не проценты авторства. Уровни признаков в исходном заключении не изменены.</p>' +
+      '<div class="kpis">' + E.classes.map(x =>
+        '<div class="kpi"><div class="kpi-t">' + esc(x.title) + '</div>' +
+        '<div class="kpi-n" style="font-size:17px">' + (x.count == null ? '—' : x.count) + '</div>' +
+        '<div class="kpi-d">' + esc(x.status) + '</div></div>').join('') + '</div>' +
+      '<p class="muted small">' + esc(E.classes[3].detail) + ' Для проверки по ключу нужны официальные инструменты поставщика модели; Check-AI их не вызывает.</p>' +
+      (E.predominantlyEnglish ? '<p class="muted small">Осторожность для академического английского: простота формулировок и низкое лексическое разнообразие могут приводить к ложным срабатываниям, особенно у пишущих не на родном языке.</p>' : '');
+  }
 
   // карта документа
   const cells = r.paras.filter(p => p.words > 0 && !p.toc);
