@@ -4,7 +4,7 @@
 'use strict';
 
 const RPR_AFTER_SHD = ['fitText', 'vertAlign', 'rtl', 'cs', 'em', 'lang', 'eastAsianLayout', 'specVanish', 'oMath'];
-const FILL = { strong: 'F9C9C3', medium: 'FCE3B0', weak: 'D5E6F7' };
+const FILL = { strong: 'F9C9C3', medium: 'FCE3B0', weak: 'D5E6F7', info: 'E8EDF4' };
 const LVL_ORDER = { strong: 3, medium: 2, weak: 1, info: 0 };
 
 function shadeRun(doc, r, fill) {
@@ -75,21 +75,36 @@ async function buildAnnotatedDocx(res) {
     'Проверка на признаки ИИ: ' + v.text,
     v.mainSource ? `Вероятный источник: ${v.mainSource}; разметка веб-интерфейса в ${fmtPct(s.markedShare)} связного текста.` : 'Разметки веб-интерфейсов нейросетей не найдено.',
     `Признаков: сильных ${s.counts.strong}, средних ${s.counts.medium}, слабых ${s.counts.weak}.`,
-    'Подсветка: розовая — сильный признак, жёлтая — средний, голубая — слабый. Комментарий у абзаца перечисляет найденное.',
+    'Цвета: розовый — сильный признак, жёлтый — средний, голубой — слабый, серо-голубой — справочный показатель краткого текста.',
+    'У каждого выделенного абзаца: «Проблема», наблюдение и «Действие по исправлению». Это научная редактура, а не гарантия изменения результатов другого детектора.',
+    'Технические метаданные о программной сборке DOCX не доказывают генерацию текста. Сведения о происхождении научного содержания требуют самостоятельного подтверждения.',
     'Это копия для анализа; исходный файл не изменён.',
   ]);
 
   res.paras.forEach((para, i) => {
-    const flags = para.flags.filter(f => f.level !== 'info');
+    const flags = para.flags.filter(f => f.level !== 'info' || f.type === 'short');
     if (!flags.length || !all[i]) return;
-    const top = flags.reduce((m, f) => LVL_ORDER[f.level] > LVL_ORDER[m] ? f.level : m, 'weak');
+    const top = flags.reduce((m, f) => LVL_ORDER[f.level] > LVL_ORDER[m] ? f.level : m, 'info');
     const runs = ownRuns(all[i]);
     if (!runs.length) return;
     runs.forEach(r => shadeRun(doc, r, FILL[top]));
     marked++;
     if (!para.inBox) {
       const uniq = [...new Map(flags.map(f => [f.label, f])).values()].sort((a, b) => LVL_ORDER[b.level] - LVL_ORDER[a.level]);
-      addComment(all[i], [`Абзац №${i + 1}: признаков ${uniq.length}`, ...uniq.map(f => `• [${LEVELS[f.level]}] ${f.label}`)]);
+      const tasks = uniq.slice(0, 8).flatMap((f, k) => {
+        const g = annotationAdvice(f, para);
+        return [
+          'Проблема ' + (k + 1) + ' [' + (LEVELS[f.level] || 'справочно') + ']: ' + g.issue,
+          'Действие по исправлению ' + (k + 1) + ': ' + g.action
+        ];
+      });
+      if (uniq.length > 8) tasks.push('Дополнительных признаков: ' + (uniq.length - 8) + '. Проверьте их в основном заключении.');
+      addComment(all[i], [
+        'Абзац №' + (i + 1) + ': научная редакторская проверка',
+        'Начало: «' + para.text.trim().slice(0, 125) + '»',
+        ...tasks,
+        'Ограничение: замечание не устанавливает авторство и не гарантирует изменение оценки внешнего детектора.'
+      ]);
     }
   });
 
