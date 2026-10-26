@@ -24,6 +24,9 @@ jobs:
           node --check src/academic_audit.js
           node --check src/discourse_audit.js
           node --check src/provenance_fairness.js
+          node --check src/offline_engine.js
+          node --check online/site_config.js
+          node --test tests/offline_engine.test.cjs
       - name: Check countermeasure diagnostics
         run: node --test tests/robustness.test.cjs tests/academic_audit.test.cjs tests/discourse_audit.test.cjs tests/provenance_fairness.test.cjs
       - name: Validate local reference-highlight audit (no source documents uploaded)
@@ -45,8 +48,8 @@ jobs:
           assert 'fonts.googleapis.com' not in offline
           assert 'async function analyzeFile' in offline
           assert 'async function analyzeFile' in online
-          assert 'Онлайн · с ИИ и интернетом' in online
-          assert 'Онлайн · с ИИ и интернетом' not in offline
+          assert 'Режим проверки' in online
+          assert 'Режим проверки' in offline
           assert '/*APP*/' not in offline and '/*APP*/' not in online
           print('Both modes and site toggle verified; offline keeps original analyzer')
           PY
