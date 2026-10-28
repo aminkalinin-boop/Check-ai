@@ -185,7 +185,7 @@ function render(r) {
       '<table><thead><tr><th>Тип ограничения</th><th>Изменение формы текста</th><th>Ограничение вывода</th></tr></thead><tbody>'+
       A.promptConditioning.map(x=>'<tr><td>'+esc(x.instruction)+'</td><td>'+esc(x.observation)+'</td><td>'+esc(x.caveat)+'</td></tr>').join('')+
       '</tbody></table>'+
-      '<div class="kpis">+[
+      '<div class="kpis">'+[
         ['Редакторских правил',A.ruleCount,'конкретные шаблоны'],
         ['Абзацев проверено',A.paragraphsReviewed,'без библиографии, таблиц и заголовков'],
         ['Абзацев с замечаниями',A.paragraphsWithNotes,'не доля ИИ'],
