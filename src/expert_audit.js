@@ -18,7 +18,7 @@ async function expertCrossAudit(res) {
       const read=async name=>{const f=zip.file(name); return f?f.async('string'):'';};
       const [xml,core,app]=await Promise.all([read('word/document.xml'),read('docProps/core.xml'),read('docProps/app.xml')]);
       const doc=new DOMParser().parseFromString(xml,'application/xml');
-      const nodes=[...doc.getElementsByTagNameNS(W_NS,'p')].filter(p=>!p.closest?.('w:tbl'));
+      const nodes=[...doc.getElementsByTagNameNS(W_NS,'p')].filter(p=>{let n=p.parentNode;while(n){if(n.localName==='tbl'&&n.namespaceURI===W_NS)return false;n=n.parentNode;}return true;});
       const distribution={};
       let eligible=0;
       for(const p of nodes){
