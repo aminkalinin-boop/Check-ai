@@ -271,7 +271,7 @@ async function expertCrossAudit(res) {
         String(e.message||e).slice(0,180),'Исходная проверка Check AI продолжает работать независимо.',caution);
     }
   }
-  const cautions=/\bне\s+(?:означа\p{L}*|подменя\p{L}*|изменя\p{L}*|требу\p{L}*)/giu;
+  const cautions=/(?<!\p{L})не\s+(?:означа\p{L}*|подменя\p{L}*|изменя\p{L}*|требу\p{L}*)/giu;
   const nCaution=countPattern(cautions);
   if(total>=600&&nCaution>=3){
     stylisticOverlap=true;
