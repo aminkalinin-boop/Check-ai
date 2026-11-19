@@ -23,6 +23,7 @@ async function handleFile(file) {
       referenceHighlights: marked,
       referenceColor: $('#reference-color').value
     });
+    await expertCrossAudit(RES);
     render(RES);
     window.dispatchEvent(new CustomEvent('check-ai:analysis-ready', { detail: { result: RES } }));
   } catch (e) {
@@ -209,11 +210,28 @@ function render(r) {
   renderParas();
 
   renderReferenceReview(r);
+  renderExpertCrossAudit(r);
   $('#annot').hidden = r.kind !== 'docx';
   $('#results').hidden = false;
   $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function renderExpertCrossAudit(r) {
+  const root=$('#expert-audit'),audit=r.expertAudit;
+  if(!root)return;
+  if(!audit){root.textContent='Дополнительная экспертиза недоступна.';return;}
+  const labels={technical:'Техническая история DOCX',linguistic:'Лингвистика и структура',academic:'Научная аргументация',cross:'Перекрёстные наблюдения'};
+  root.innerHTML='<p class="muted small">'+esc(audit.disclaimer)+'</p>'+
+    Object.entries(labels).map(([key,title])=>{
+      const entries=audit.checks.filter(x=>x.group===key);
+      return '<div class="group"><h3>'+esc(title)+' <span class="cnt">'+entries.length+'</span></h3>'+
+        (entries.map(x=>'<details class="finding"><summary><span class="f-title">'+esc(x.title)+'</span></summary>'+
+        '<div class="f-body"><p>'+esc(x.detail)+'</p><p><b>Наблюдение:</b> '+esc(x.evidence)+'</p>'+
+        '<p><b>Альтернативное объяснение:</b> '+esc(x.limit)+'</p>'+
+        '<p class="muted small">'+esc(x.alternatives)+'</p></div></details>').join('')||
+          '<p class="muted small">Автоматических наблюдений нет.</p>')+'</div>';
+    }).join('');
+}
 function renderReferenceReview(r) {
   const ref = r.reference;
   $('#reference-tab').hidden = !ref;

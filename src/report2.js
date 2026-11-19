@@ -359,6 +359,22 @@ async function buildReportDocx(res) {
   }
   if (editorTargets.length>300) out.push(P('В отчёте первые 300 абзацев; полный список наблюдений доступен в приложении Б и исходном документе.'));
   
+  // Независимый дополнительный аудит: не меняет первоначальные выводы.
+  if (res.expertAudit) {
+    out.push(H1('Приложение. Комплексная экспертная экспертиза'));
+    out.push(P(res.expertAudit.disclaimer));
+    const names={technical:'Техническая история DOCX',linguistic:'Лингвистика и структура',academic:'Научная аргументация',cross:'Перекрёстные наблюдения'};
+    for(const [group,title] of Object.entries(names)){
+      out.push(H2(title));
+      const entries=res.expertAudit.checks.filter(x=>x.group===group);
+      if(!entries.length)out.push(P('Автоматических наблюдений нет.'));
+      for(const item of entries){
+        out.push(P(item.title+'. '+item.detail));
+        out.push(para('Наблюдение: '+item.evidence,{style:'Small'}));
+        out.push(para('Альтернативное объяснение: '+item.limit,{style:'Small'}));
+      }
+    }
+  }
   // Evidence-based reference appendix is generated in BOTH site modes.
   if (res.stats.knowledgeAudit) {
     const knowledge = res.stats.knowledgeAudit;
